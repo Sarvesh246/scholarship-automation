@@ -30,9 +30,9 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-md rounded-md bg-[var(--surface)] p-6 shadow-lg">
-        <h2 className="text-sm font-semibold">{title}</h2>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-lg">
+        <h2 className="text-sm font-semibold font-heading">{title}</h2>
         {description && (
           <p className="mt-1 text-xs text-[var(--muted)]">{description}</p>
         )}
@@ -53,7 +53,6 @@ export function Modal({
             type="button"
             size="sm"
             variant={destructive ? "destructive" : "primary"}
-            className={cn(destructive && "text-white")}
             onClick={() => {
               onPrimary?.();
               onClose();
@@ -66,4 +65,3 @@ export function Modal({
     </div>
   );
 }
-

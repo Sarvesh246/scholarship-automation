@@ -1,3 +1,5 @@
+"use client";
+
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DeadlineList } from "@/components/feature/DeadlineList";
 import { deadlines } from "@/data/mockData";
@@ -26,7 +28,7 @@ export default function DeadlinesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Deadlines"
-        subtitle="See what’s due this week and beyond."
+        subtitle="See what's due this week and beyond."
       />
       <DeadlineList
         groups={[
@@ -38,4 +40,3 @@ export default function DeadlinesPage() {
     </div>
   );
 }
-

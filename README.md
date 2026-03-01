@@ -1,4 +1,4 @@
-# Scholarship Workflow
+# ApplyPilot
 
 A calm, structured web app for managing scholarship applications: track deadlines, organize documents, and draft essays in one dashboard. Built with Next.js 14 (App Router), TypeScript, Tailwind CSS, and Firebase Auth.
 

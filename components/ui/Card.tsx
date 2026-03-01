@@ -11,9 +11,9 @@ export function Card({ children, className, clickable }: CardProps) {
   return (
     <div
       className={cn(
-        "rounded-md border border-[var(--border)] bg-[var(--surface)] p-6 shadow-sm",
+        "rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-sm transition-all",
         clickable &&
-          "cursor-pointer transition hover:-translate-y-0.5 hover:border-[var(--text)] hover:shadow-md",
+          "cursor-pointer hover:-translate-y-1 hover:border-amber-500/30 hover:shadow-lg",
         className
       )}
     >
@@ -21,4 +21,3 @@ export function Card({ children, className, clickable }: CardProps) {
     </div>
   );
 }
-

@@ -9,7 +9,7 @@ interface TabsProps {
 
 export function Tabs({ value, onChange, tabs }: TabsProps) {
   return (
-    <div className="inline-flex rounded-full bg-[var(--surface-2)] p-1 text-xs">
+    <div className="inline-flex rounded-full bg-[var(--surface)] border border-[var(--border)] p-1 text-xs">
       {tabs.map((tab) => (
         <button
           key={tab.value}
@@ -18,7 +18,7 @@ export function Tabs({ value, onChange, tabs }: TabsProps) {
           className={cn(
             "rounded-full px-3 py-1 font-medium text-[var(--muted)] transition",
             value === tab.value &&
-              "bg-[var(--surface)] text-[var(--text)] shadow-sm"
+              "bg-amber-500/10 text-amber-400 shadow-sm"
           )}
         >
           {tab.label}
@@ -52,7 +52,7 @@ export function Tab({ value, current, onChange, children }: TabProps) {
       className={cn(
         "border-b-2 px-2 pb-2 text-xs font-medium text-[var(--muted)]",
         isActive
-          ? "border-[var(--primary)] text-[var(--text)]"
+          ? "border-amber-500 text-amber-400"
           : "border-transparent hover:text-[var(--text)]"
       )}
     >
@@ -60,4 +60,3 @@ export function Tab({ value, current, onChange, children }: TabProps) {
     </button>
   );
 }
-

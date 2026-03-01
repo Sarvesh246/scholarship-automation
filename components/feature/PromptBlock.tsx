@@ -8,7 +8,7 @@ interface PromptBlockProps {
 
 export function PromptBlock({ prompt, value, onChange }: PromptBlockProps) {
   return (
-    <div className="space-y-2 rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 text-sm shadow-sm">
+    <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm shadow-sm">
       <p className="text-xs font-medium text-[var(--text)]">{prompt}</p>
       <Textarea
         value={value}
@@ -16,9 +16,8 @@ export function PromptBlock({ prompt, value, onChange }: PromptBlockProps) {
         placeholder="Draft your response here..."
       />
       <p className="text-[10px] text-[var(--muted-2)]">
-        Autosave: <span className="font-medium">Saved just now</span>
+        Autosave: <span className="font-medium text-emerald-400">Saved just now</span>
       </p>
     </div>
   );
 }
-

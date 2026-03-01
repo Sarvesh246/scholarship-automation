@@ -1,34 +1,38 @@
 import type { Metadata } from "next";
+import { DM_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ReactNode } from "react";
 import { ToastProvider } from "@/components/ui/Toast";
+import { FirebaseAnalyticsInit } from "@/components/FirebaseAnalyticsInit";
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+  weight: ["400", "500", "600", "700"]
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-heading",
+  display: "swap",
+  weight: ["400", "500", "600", "700"]
+});
 
 export const metadata: Metadata = {
-  title: "Scholarship Workflow",
-  description: "Calm, structured scholarship application workflow manager."
+  title: "ApplyPilot - Your Scholarship Co-Pilot",
+  description: "A calm, structured workspace to discover scholarships, track applications, and land funding."
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                var stored = localStorage.getItem('theme');
-                var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-                var theme = stored === 'light' || stored === 'dark' ? stored : (prefersDark ? 'dark' : 'light');
-                if (theme === 'dark') document.documentElement.classList.add('dark');
-                else document.documentElement.classList.remove('dark');
-              })();
-            `
-          }}
-        />
-        <ToastProvider>{children}</ToastProvider>
+    <html lang="en" suppressHydrationWarning className={`${dmSans.variable} ${spaceGrotesk.variable}`}>
+      <body>
+        <ToastProvider>
+          <FirebaseAnalyticsInit />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );
 }
-
-

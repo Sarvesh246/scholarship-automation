@@ -48,10 +48,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={toast.id}
             className={cn(
-              "rounded-md border px-3 py-2 shadow-md bg-[var(--surface)] border-[var(--border)] text-[var(--text)]",
-              toast.variant === "success" && "border-[var(--success-soft)]",
-              toast.variant === "warning" && "border-[var(--warning-soft)]",
-              toast.variant === "danger" && "border-[var(--danger-soft)]"
+              "rounded-xl border px-3 py-2 shadow-lg bg-[var(--surface)] border-[var(--border)] text-[var(--text)]",
+              toast.variant === "success" && "border-emerald-500/30",
+              toast.variant === "warning" && "border-amber-500/30",
+              toast.variant === "danger" && "border-red-500/30"
             )}
           >
             <div className="flex items-start justify-between gap-2">
@@ -66,7 +66,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               {toast.actionLabel && toast.onAction && (
                 <button
                   type="button"
-                  className="rounded-md bg-[var(--surface-2)] px-2 py-1 text-[10px] font-medium text-[var(--text)] hover:bg-[var(--surface-2)]/80"
+                  className="rounded-lg bg-[var(--surface-2)] px-2 py-1 text-[10px] font-medium text-[var(--text)] hover:bg-amber-500/10 transition-colors"
                   onClick={toast.onAction}
                 >
                   {toast.actionLabel}
@@ -87,4 +87,3 @@ export function useToast() {
   }
   return ctx;
 }
-

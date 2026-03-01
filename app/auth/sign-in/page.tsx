@@ -58,7 +58,7 @@ export default function SignInPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold">Welcome back</h1>
+        <h1 className="text-lg font-semibold font-heading">Welcome back</h1>
         <p className="text-xs text-[var(--muted)]">
           Sign in to your calm scholarship workspace.
         </p>

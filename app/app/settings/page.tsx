@@ -36,7 +36,7 @@ export default function SettingsPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="space-y-4 p-4">
-          <h3 className="text-sm font-semibold">Notifications</h3>
+          <h3 className="text-sm font-semibold font-heading">Notifications</h3>
           <div className="flex items-center justify-between text-xs">
             <div>
               <p className="font-medium text-[var(--text)]">
@@ -73,7 +73,7 @@ export default function SettingsPage() {
         </Card>
 
         <Card className="space-y-4 p-4">
-          <h3 className="text-sm font-semibold">Account</h3>
+          <h3 className="text-sm font-semibold font-heading">Account</h3>
           <p className="text-xs text-[var(--muted)]">
             In this base UI, account details come from Firebase Auth.
           </p>
@@ -85,7 +85,7 @@ export default function SettingsPage() {
           </div>
           <Button
             type="button"
-            variant="secondary"
+            variant="destructive"
             size="sm"
             onClick={handleSignOut}
           >
@@ -96,4 +96,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

@@ -20,7 +20,7 @@ export function Select({ label, className, id, children, ...props }: SelectProps
       <select
         id={selectId}
         className={cn(
-          "h-11 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg)]",
+          "h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] shadow-sm transition-all focus:outline-none focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20",
           className
         )}
         {...props}
@@ -30,4 +30,3 @@ export function Select({ label, className, id, children, ...props }: SelectProps
     </div>
   );
 }
-

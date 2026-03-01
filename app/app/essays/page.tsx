@@ -1,16 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { EssayCard } from "@/components/feature/EssayCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { essays } from "@/data/mockData";
+import { getEssays } from "@/lib/essayStorage";
+import type { Essay } from "@/types";
 
 export default function EssaysPage() {
   const router = useRouter();
-  const [items] = useState(essays);
+  const [items, setItems] = useState<Essay[]>([]);
+
+  const loadEssays = () => setItems(getEssays());
+
+  useEffect(() => {
+    loadEssays();
+  }, []);
+
+  useEffect(() => {
+    const onFocus = () => loadEssays();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
 
   const handleNewEssay = () => {
     router.push("/app/essays/new");
@@ -31,7 +44,7 @@ export default function EssaysPage() {
       {items.length === 0 ? (
         <EmptyState
           title="No essays yet"
-          description="Start your first essay draft—reuse it across similar scholarships."
+          description="Start your first essay draft — reuse it across similar scholarships."
           actionLabel="New essay"
           onAction={handleNewEssay}
         />
@@ -45,4 +58,3 @@ export default function EssaysPage() {
     </div>
   );
 }
-

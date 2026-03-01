@@ -12,10 +12,15 @@ import { scholarships } from "@/data/mockData";
 export default function ScholarshipsPage() {
   const [query, setQuery] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [items, setItems] = useState(scholarships);
 
-  const filtered = scholarships.filter((s) =>
+  const filtered = items.filter((s) =>
     s.title.toLowerCase().includes(query.toLowerCase())
   );
+
+  const handleDeleteScholarship = (id: string) => {
+    setItems((previous) => previous.filter((scholarship) => scholarship.id !== id));
+  };
 
   return (
     <div className="space-y-6">
@@ -24,7 +29,7 @@ export default function ScholarshipsPage() {
         subtitle="Browse and choose where to invest your time."
       />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
         <div className="w-full max-w-xs">
           <Input
             placeholder="Search scholarships"
@@ -48,7 +53,11 @@ export default function ScholarshipsPage() {
 
       <div className="space-y-3">
         {filtered.map((scholarship) => (
-          <ScholarshipRowCard key={scholarship.id} scholarship={scholarship} />
+          <ScholarshipRowCard
+            key={scholarship.id}
+            scholarship={scholarship}
+            onDelete={() => handleDeleteScholarship(scholarship.id)}
+          />
         ))}
       </div>
 
@@ -84,4 +93,3 @@ export default function ScholarshipsPage() {
     </div>
   );
 }
-

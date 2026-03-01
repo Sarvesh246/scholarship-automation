@@ -31,7 +31,7 @@ export function DropdownMenu({
         <DropdownContext.Provider value={{ close: () => setOpen(false) }}>
           <div
             className={cn(
-              "absolute z-30 mt-2 min-w-[160px] rounded-md border border-[var(--border)] bg-[var(--surface)] p-1 text-xs shadow-md",
+              "absolute z-30 mt-2 min-w-[160px] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 text-xs shadow-lg",
               align === "end" ? "right-0" : "left-0"
             )}
           >
@@ -60,8 +60,8 @@ export function DropdownItem({
     <button
       type="button"
       className={cn(
-        "flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[var(--muted)] hover:bg-[var(--surface-2)]",
-        danger && "text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+        "flex w-full items-center rounded-lg px-2 py-1.5 text-left text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] transition-colors",
+        danger && "text-red-400 hover:bg-red-500/10 hover:text-red-400"
       )}
       onClick={() => {
         ctx?.close();
@@ -72,4 +72,3 @@ export function DropdownItem({
     </button>
   );
 }
-

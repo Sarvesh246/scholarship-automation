@@ -13,17 +13,17 @@ export interface ButtonProps
 }
 
 const baseClasses =
-  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg)] disabled:opacity-60 disabled:cursor-not-allowed";
+  "inline-flex items-center justify-center rounded-lg text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:ring-offset-2 focus:ring-offset-[var(--bg)] disabled:opacity-60 disabled:cursor-not-allowed";
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    "bg-[var(--primary)] text-white shadow-sm hover:bg-[var(--primary-hover)]",
+    "bg-gradient-to-r from-amber-600 to-amber-500 text-black shadow-sm hover:shadow-[0_10px_30px_rgba(217,119,6,0.3)] hover:-translate-y-0.5",
   secondary:
-    "border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[var(--text)]",
+    "border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-amber-500/50 hover:bg-amber-500/5",
   ghost:
-    "text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+    "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
   destructive:
-    "bg-[var(--danger)] text-white hover:bg-[var(--danger-soft)] hover:text-[var(--danger)]"
+    "bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20"
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -53,4 +53,3 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 );
 
 Button.displayName = "Button";
-

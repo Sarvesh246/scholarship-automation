@@ -5,12 +5,11 @@ interface ProgressBarProps {
 export function ProgressBar({ value }: ProgressBarProps) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <div className="h-1.5 w-full rounded-full bg-[var(--border)]">
+    <div className="progress-track">
       <div
-        className="h-1.5 rounded-full bg-[var(--primary)] transition-all"
+        className="progress-fill"
         style={{ width: `${clamped}%` }}
       />
     </div>
   );
 }
-

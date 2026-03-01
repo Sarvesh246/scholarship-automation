@@ -15,7 +15,7 @@ export function EssayCard({ essay }: EssayCardProps) {
   return (
     <Link
       href={`/app/essays/${essay.id}`}
-      className="flex flex-col gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--text)] hover:shadow-md"
+      className="flex flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm shadow-sm transition-all hover:-translate-y-1 hover:border-amber-500/30 hover:shadow-lg"
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-sm font-semibold leading-snug">{essay.title}</h3>
@@ -34,4 +34,3 @@ export function EssayCard({ essay }: EssayCardProps) {
     </Link>
   );
 }
-

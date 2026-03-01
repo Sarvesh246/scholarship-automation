@@ -13,20 +13,19 @@ export function Switch({ checked, className, ...props }: SwitchProps) {
       role="switch"
       aria-checked={checked}
       className={cn(
-        "relative inline-flex h-5 w-9 items-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg)]",
-        checked && "bg-[var(--primary-soft)] border-[var(--primary)]",
+        "relative inline-flex h-5 w-9 items-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] transition-colors duration-[400ms] ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:ring-offset-2 focus:ring-offset-[var(--bg)]",
+        checked && "bg-amber-500/20 border-amber-500",
         className
       )}
       {...props}
     >
       <span
         className={cn(
-          "inline-block h-3.5 w-3.5 transform rounded-full bg-[var(--muted-2)] transition-transform",
-          checked && "translate-x-3.5 bg-[var(--primary)]",
-          !checked && "translate-x-0.5"
+          "absolute top-1/2 h-3.5 w-3.5 shrink-0 -translate-y-1/2 rounded-full bg-[var(--muted-2)] transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]",
+          checked && "left-auto right-0.5 bg-amber-500",
+          !checked && "left-0.5 right-auto"
         )}
       />
     </button>
   );
 }
-

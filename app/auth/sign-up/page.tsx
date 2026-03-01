@@ -66,7 +66,7 @@ export default function SignUpPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold">Create your workspace</h1>
+        <h1 className="text-lg font-semibold font-heading">Create your workspace</h1>
         <p className="text-xs text-[var(--muted)]">
           Set up a calm place to manage scholarships.
         </p>

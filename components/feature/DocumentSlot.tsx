@@ -22,10 +22,10 @@ export function DocumentSlot({ label, uploaded, onUpload }: DocumentSlotProps) {
   };
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2.5 text-xs">
       <div className="flex flex-col">
         <span className="font-medium">{label}</span>
-        <span className="text-[10px] text-[var(--muted-2)]">
+        <span className={`text-[10px] ${uploaded ? "text-emerald-400" : "text-[var(--muted-2)]"}`}>
           {uploaded ? "Uploaded" : "Not uploaded"}
         </span>
       </div>
@@ -49,4 +49,3 @@ export function DocumentSlot({ label, uploaded, onUpload }: DocumentSlotProps) {
     </div>
   );
 }
-

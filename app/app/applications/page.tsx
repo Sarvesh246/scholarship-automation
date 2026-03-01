@@ -1,16 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/Badge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Tabs } from "@/components/ui/Tabs";
 import { PipelineBoard } from "@/components/feature/PipelineBoard";
-import { applications, scholarships } from "@/data/mockData";
+import { getApplications } from "@/lib/applicationStorage";
+import { scholarships } from "@/data/mockData";
 
 export default function ApplicationsPage() {
   const [view, setView] = useState<"board" | "list">("board");
+  const [applications, setApplications] = useState(() => getApplications());
+
+  const loadApplications = () => setApplications(getApplications());
+
+  useEffect(() => {
+    loadApplications();
+  }, []);
+
+  useEffect(() => {
+    const onFocus = () => loadApplications();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
 
   const cards = applications.map((app) => {
     const scholarship = scholarships.find((s) => s.id === app.scholarshipId);
@@ -33,7 +47,7 @@ export default function ApplicationsPage() {
         primaryAction={
           <Link
             href="/app/scholarships"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white shadow-sm hover:bg-[var(--primary-hover)]"
+            className="btn-gold text-sm py-2 px-5"
           >
             New application
           </Link>
@@ -57,7 +71,7 @@ export default function ApplicationsPage() {
       {view === "board" ? (
         <PipelineBoard applications={cards} />
       ) : (
-        <div className="space-y-2 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 text-xs">
+        <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 text-xs">
           {applications.map((app) => {
             const scholarship = scholarships.find(
               (s) => s.id === app.scholarshipId
@@ -66,7 +80,7 @@ export default function ApplicationsPage() {
               <Link
                 key={app.id}
                 href={`/app/applications/${app.id}`}
-                className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-[var(--surface-2)]"
+                className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 hover:bg-[var(--surface-2)] transition-colors"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-medium">
@@ -96,4 +110,3 @@ export default function ApplicationsPage() {
     </div>
   );
 }
-

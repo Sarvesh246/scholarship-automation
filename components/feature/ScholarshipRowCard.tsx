@@ -7,11 +7,24 @@ import { useState } from "react";
 
 interface Props {
   scholarship: Scholarship;
+  onDelete?: () => void;
 }
 
-export function ScholarshipRowCard({ scholarship }: Props) {
+export function ScholarshipRowCard({ scholarship, onDelete }: Props) {
   const [saved, setSaved] = useState(false);
   const router = useRouter();
+
+  const handleDeleteClick = () => {
+    if (!onDelete) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${scholarship.title}"? This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    onDelete();
+  };
 
   const deadline = new Date(scholarship.deadline).toLocaleDateString(
     undefined,
@@ -23,21 +36,20 @@ export function ScholarshipRowCard({ scholarship }: Props) {
   };
 
   return (
-    <div className="flex items-center gap-4 rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--text)] hover:shadow-md">
+    <div className="flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 text-sm shadow-sm transition-all hover:-translate-y-1 hover:border-amber-500/30 hover:shadow-lg">
       <div className="min-w-0 flex-1 space-y-1">
         <Link
           href={`/app/scholarships/${scholarship.id}`}
-          className="font-semibold hover:underline"
+          className="font-semibold hover:text-amber-400 transition-colors"
         >
           {scholarship.title}
         </Link>
         <p className="text-xs text-[var(--muted-2)]">
           {scholarship.sponsor}
         </p>
-        <div className="mt-1 flex flex-wrap gap-2 text-xs text-[var(--muted)]">
-          <span>
-            Amount:{" "}
-            <span className="font-medium">
+        <div className="mt-1 flex flex-wrap gap-3 text-xs text-[var(--muted)]">
+          <span className="flex items-center gap-1">
+            <span className="text-amber-400 font-medium">
               ${scholarship.amount.toLocaleString()}
             </span>
           </span>
@@ -58,16 +70,26 @@ export function ScholarshipRowCard({ scholarship }: Props) {
         >
           Start
         </Button>
-        <button
-          type="button"
-          aria-label={saved ? "Remove bookmark" : "Save scholarship"}
-          className="text-xs text-[var(--muted-2)] hover:text-[var(--text)]"
-          onClick={() => setSaved((v) => !v)}
-        >
-          {saved ? "Saved" : "Save"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            aria-label={saved ? "Remove bookmark" : "Save scholarship"}
+            className="text-xs text-[var(--muted-2)] hover:text-amber-400 transition-colors"
+            onClick={() => setSaved((v) => !v)}
+          >
+            {saved ? "Saved" : "Save"}
+          </button>
+          {onDelete && (
+            <button
+              type="button"
+              className="text-xs text-red-400 hover:text-red-300 transition-colors"
+              onClick={handleDeleteClick}
+            >
+              Delete
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
-

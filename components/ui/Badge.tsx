@@ -13,12 +13,13 @@ const badgeClasses: Record<BadgeVariant, string> = {
   neutral:
     "bg-[var(--surface-2)] text-[var(--muted)] border border-[var(--border)]",
   success:
-    "bg-[var(--success-soft)] text-[var(--success)] border border-[var(--success-soft)]",
+    "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
   warning:
-    "bg-[var(--warning-soft)] text-[var(--warning)] border border-[var(--warning-soft)]",
+    "bg-amber-500/10 text-amber-400 border border-amber-500/20",
   danger:
-    "bg-[var(--danger-soft)] text-[var(--danger)] border border-[var(--danger-soft)]",
-  info: "bg-[var(--info-soft)] text-[var(--info)] border border-[var(--info-soft)]"
+    "bg-red-500/10 text-red-400 border border-red-500/20",
+  info:
+    "bg-blue-500/10 text-blue-400 border border-blue-500/20"
 };
 
 export function Badge({ children, variant = "neutral", className }: BadgeProps) {
@@ -34,4 +35,3 @@ export function Badge({ children, variant = "neutral", className }: BadgeProps) 
     </span>
   );
 }
-

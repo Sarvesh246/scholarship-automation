@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { applications, scholarships } from "@/data/mockData";
+import { getApplication, updateApplicationStatus } from "@/lib/applicationStorage";
+import { scholarships } from "@/data/mockData";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -20,12 +21,16 @@ export default function ApplicationWorkspacePage() {
   const id = params?.id as string;
   const router = useRouter();
   const { showToast } = useToast();
-  const application = applications.find((a) => a.id === id);
+  const [application, setApplication] = useState(() => getApplication(id));
   const scholarship = scholarships.find(
     (s) => s.id === application?.scholarshipId
   );
   const [step, setStep] = useState<StepKey>("overview");
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    setApplication(getApplication(id));
+  }, [id]);
 
   if (!application || !scholarship) {
     return (
@@ -47,6 +52,9 @@ export default function ApplicationWorkspacePage() {
   ];
 
   const handleMarkSubmitted = () => {
+    updateApplicationStatus(id, "submitted", 100);
+    setApplication(getApplication(id));
+    setConfirmOpen(false);
     showToast({
       title: "Marked as submitted",
       message: "Track this as submitted in your pipeline.",
@@ -67,7 +75,7 @@ export default function ApplicationWorkspacePage() {
       />
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.5fr)_minmax(0,0.9fr)]">
-        <div className="space-y-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 text-xs">
+        <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 text-xs">
           <p className="text-[10px] font-medium text-[var(--muted-2)]">
             Steps
           </p>
@@ -77,9 +85,9 @@ export default function ApplicationWorkspacePage() {
                 <button
                   type="button"
                   onClick={() => setStep(s.key)}
-                  className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left ${
+                  className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors ${
                     step === s.key
-                      ? "bg-[var(--primary-soft)] text-[var(--primary)]"
+                      ? "bg-amber-500/10 text-amber-400"
                       : "text-[var(--muted)] hover:bg-[var(--surface-2)]"
                   }`}
                 >
@@ -95,10 +103,10 @@ export default function ApplicationWorkspacePage() {
           </ol>
         </div>
 
-        <div className="space-y-4 rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
+        <div className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
           {step === "overview" && (
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold">Overview</h3>
+              <h3 className="text-sm font-semibold font-heading">Overview</h3>
               <p className="text-xs text-[var(--muted)]">
                 Use this workspace to move from idea to submitted application
                 without losing track of documents or drafts.
@@ -107,7 +115,7 @@ export default function ApplicationWorkspacePage() {
           )}
           {step === "eligibility" && (
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold">Eligibility</h3>
+              <h3 className="text-sm font-semibold font-heading">Eligibility</h3>
               <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-[var(--muted)]">
                 {scholarship.eligibilityTags.map((tag) => (
                   <li key={tag}>{tag}</li>
@@ -117,7 +125,7 @@ export default function ApplicationWorkspacePage() {
           )}
           {step === "documents" && (
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold">Documents</h3>
+              <h3 className="text-sm font-semibold font-heading">Documents</h3>
               <div className="space-y-2">
                 {application.docsRequired.map((doc) => (
                   <DocumentSlot
@@ -131,22 +139,20 @@ export default function ApplicationWorkspacePage() {
           )}
           {step === "prompts" && (
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold">Prompts</h3>
+              <h3 className="text-sm font-semibold font-heading">Prompts</h3>
               {scholarship.prompts.map((prompt, index) => (
                 <PromptBlock
                   key={index}
                   prompt={prompt}
                   value={application.promptResponses[index]?.response ?? ""}
-                  onChange={() => {
-                    // Local-only in this mock.
-                  }}
+                  onChange={() => {}}
                 />
               ))}
             </div>
           )}
           {step === "final" && (
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Final review</h3>
+              <h3 className="text-sm font-semibold font-heading">Final review</h3>
               <Checklist
                 items={[
                   {
@@ -162,7 +168,7 @@ export default function ApplicationWorkspacePage() {
                   }
                 ]}
               />
-              <div className="rounded-md bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--muted)]">
+              <div className="rounded-xl bg-[var(--bg-secondary)] px-3 py-2 text-xs text-[var(--muted)]">
                 Export and submission are currently placeholders. Use this
                 checklist to confirm you are ready to submit on the official
                 scholarship website.
@@ -178,8 +184,8 @@ export default function ApplicationWorkspacePage() {
           )}
         </div>
 
-        <div className="space-y-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 text-xs">
-          <h3 className="text-sm font-semibold">Application summary</h3>
+        <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-xs">
+          <h3 className="text-sm font-semibold font-heading">Application summary</h3>
           <div className="mt-2 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[var(--muted-2)]">Status</span>
@@ -195,7 +201,7 @@ export default function ApplicationWorkspacePage() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[var(--muted-2)]">Progress</span>
-              <span className="font-medium">{application.progress}%</span>
+              <span className="font-medium text-amber-400">{application.progress}%</span>
             </div>
             <ProgressBar value={application.progress} />
             <div className="flex items-center justify-between">
@@ -214,7 +220,7 @@ export default function ApplicationWorkspacePage() {
       <Modal
         open={confirmOpen}
         title="Mark as submitted?"
-        description="This won’t actually send anything, but helps you track what’s been submitted."
+        description="This won't actually send anything, but helps you track what's been submitted."
         primaryLabel="Mark submitted"
         onClose={() => setConfirmOpen(false)}
         onPrimary={handleMarkSubmitted}
@@ -222,4 +228,3 @@ export default function ApplicationWorkspacePage() {
     </div>
   );
 }
-

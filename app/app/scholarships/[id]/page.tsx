@@ -11,6 +11,7 @@ import { TabList, Tab } from "@/components/ui/Tabs";
 import { PromptBlock } from "@/components/feature/PromptBlock";
 import { Checklist } from "@/components/feature/Checklist";
 import { useToast } from "@/components/ui/Toast";
+import { ensureApplication } from "@/lib/applicationStorage";
 
 export default function ScholarshipDetailPage() {
   const params = useParams();
@@ -33,8 +34,8 @@ export default function ScholarshipDetailPage() {
   }
 
   const handleStart = () => {
-    const applicationId = `app-${scholarship.id}`;
-    router.push(`/app/applications/${applicationId}`);
+    ensureApplication(scholarship.id);
+    router.push(`/app/applications/app-${scholarship.id}`);
     showToast({
       title: "Application started",
       message: `${scholarship.title} has been added to your pipeline.`,
@@ -100,14 +101,14 @@ export default function ScholarshipDetailPage() {
           </TabList>
 
           {tab === "overview" && (
-            <div className="space-y-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
+            <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
               <p className="text-[var(--text)]">{scholarship.description}</p>
             </div>
           )}
 
           {tab === "requirements" && (
-            <div className="space-y-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
-              <h3 className="text-sm font-semibold">Eligibility</h3>
+            <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
+              <h3 className="text-sm font-semibold font-heading">Eligibility</h3>
               <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-[var(--muted)]">
                 {scholarship.eligibilityTags.map((tag) => (
                   <li key={tag}>{tag}</li>
@@ -155,8 +156,8 @@ export default function ScholarshipDetailPage() {
           )}
         </div>
 
-        <div className="space-y-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
-          <h3 className="text-sm font-semibold">At a glance</h3>
+        <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
+          <h3 className="text-sm font-semibold font-heading">At a glance</h3>
           <dl className="mt-2 space-y-2 text-xs text-[var(--muted)]">
             <div className="flex justify-between">
               <dt>Estimated time</dt>
@@ -176,4 +177,3 @@ export default function ScholarshipDetailPage() {
     </div>
   );
 }
-

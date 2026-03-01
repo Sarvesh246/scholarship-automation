@@ -15,11 +15,10 @@ export function AppShell({ children, pageTitle }: AppShellProps) {
       <SidebarNav />
       <div className="flex min-h-screen flex-1 flex-col">
         <TopBar pageTitle={pageTitle} />
-        <main className="flex-1 px-6 pb-8 pt-4 md:px-8">
+        <main className="flex-1 px-6 pb-8 pt-6 md:px-8">
           <div className="mx-auto max-w-6xl">{children}</div>
         </main>
       </div>
     </div>
   );
 }
-

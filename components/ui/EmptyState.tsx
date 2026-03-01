@@ -17,7 +17,7 @@ export function EmptyState({
   icon
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-10 text-center">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-10 text-center">
       {icon && <div className="mb-3 text-[var(--muted)]">{icon}</div>}
       <h2 className="text-sm font-semibold text-[var(--text)]">{title}</h2>
       <p className="mt-1 max-w-md text-xs text-[var(--muted)]">
@@ -36,4 +36,3 @@ export function EmptyState({
     </div>
   );
 }
-

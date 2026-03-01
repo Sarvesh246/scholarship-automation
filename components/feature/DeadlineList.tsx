@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 
@@ -30,9 +32,9 @@ export function DeadlineList({ groups, onResume }: DeadlineListProps) {
               {group.items.length} deadlines
             </span>
           </div>
-          <div className="space-y-2 rounded-md bg-[var(--surface-2)]/50 p-2">
+          <div className="space-y-2 rounded-xl bg-[var(--bg-secondary)] p-2">
             {group.items.length === 0 && (
-              <p className="rounded-md border border-dashed border-[var(--border)] bg-[var(--surface)] px-2 py-2 text-[10px] text-[var(--muted-2)]">
+              <p className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-2 py-2 text-[10px] text-[var(--muted-2)]">
                 Nothing urgent in this window.
               </p>
             )}
@@ -44,10 +46,10 @@ export function DeadlineList({ groups, onResume }: DeadlineListProps) {
               return (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between gap-2 rounded-md bg-[var(--surface)] px-2 py-2 text-xs shadow-sm"
+                  className="flex items-center justify-between gap-2 rounded-xl bg-[var(--surface)] px-3 py-2.5 text-xs shadow-sm"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] text-[var(--muted-2)]">
+                    <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] text-amber-400 font-medium">
                       {date}
                     </span>
                     <div>
@@ -88,4 +90,3 @@ export function DeadlineList({ groups, onResume }: DeadlineListProps) {
     </div>
   );
 }
-
