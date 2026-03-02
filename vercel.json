@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/sync-scholarships",
-      "schedule": "0 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
