@@ -1,43 +1,41 @@
 import type { Essay } from "@/types";
-import { essays as defaultEssays } from "@/data/mockData";
+import { auth, db } from "./firebase";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  deleteDoc
+} from "firebase/firestore";
 
-const STORAGE_KEY = "scholarship-app-essays";
+function getUserEssaysRef() {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return null;
+  return collection(db, "users", uid, "essays");
+}
 
-function getStored(): Essay[] {
-  if (typeof window === "undefined") return [];
+export async function getEssays(): Promise<Essay[]> {
+  const ref = getUserEssaysRef();
+  if (!ref) return [];
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Essay[];
-    return Array.isArray(parsed) ? parsed : [];
+    const snap = await getDocs(ref);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Essay);
   } catch {
     return [];
   }
 }
 
-function setStored(list: Essay[]) {
-  if (typeof window === "undefined") return;
+export async function getEssay(id: string): Promise<Essay | null> {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return null;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-  } catch (_) {}
-}
-
-/**
- * Get all essays: from localStorage if any, otherwise seed from mock data once.
- */
-export function getEssays(): Essay[] {
-  const stored = getStored();
-  if (stored.length > 0) return stored;
-  setStored(defaultEssays);
-  return defaultEssays;
-}
-
-/**
- * Get one essay by id. Checks localStorage first, then mock data.
- */
-export function getEssay(id: string): Essay | null {
-  const list = getEssays();
-  return list.find((e) => e.id === id) ?? null;
+    const snap = await getDoc(doc(db, "users", uid, "essays", id));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() } as Essay;
+  } catch {
+    return null;
+  }
 }
 
 function wordCount(text: string): number {
@@ -45,40 +43,40 @@ function wordCount(text: string): number {
   return text.trim().split(/\s+/).length;
 }
 
-/**
- * Save an essay (create or update). Assigns id and updatedAt if new.
- */
-export function saveEssay(essay: {
+export async function saveEssay(essay: {
   id?: string;
   title: string;
   tags: string[];
   content: string;
-}): Essay {
-  const list = getStored().length > 0 ? getStored() : [...defaultEssays];
+}): Promise<Essay> {
+  const uid = auth?.currentUser?.uid;
+  const essayId = essay.id ?? `essay-${Date.now()}`;
   const now = new Date().toISOString();
-  const updated: Essay = {
-    id: essay.id ?? `essay-${Date.now()}`,
+  const record: Essay = {
+    id: essayId,
     title: essay.title || "Untitled essay",
     tags: essay.tags?.length ? essay.tags : ["General"],
     wordCount: wordCount(essay.content ?? ""),
     updatedAt: now,
     content: essay.content ?? ""
   };
-  const idx = list.findIndex((e) => e.id === updated.id);
-  if (idx >= 0) {
-    list[idx] = updated;
-  } else {
-    list.push(updated);
+
+  if (!db || !uid) return record;
+  try {
+    const { id, ...data } = record;
+    await setDoc(doc(db, "users", uid, "essays", id), data);
+  } catch {
+    /* write failed */
   }
-  setStored(list);
-  return updated;
+  return record;
 }
 
-/**
- * Delete an essay by id.
- */
-export function deleteEssay(id: string): void {
-  const list = getStored();
-  const next = list.filter((e) => e.id !== id);
-  setStored(next);
+export async function deleteEssay(id: string): Promise<void> {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return;
+  try {
+    await deleteDoc(doc(db, "users", uid, "essays", id));
+  } catch {
+    /* silent */
+  }
 }

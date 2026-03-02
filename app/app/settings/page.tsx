@@ -7,11 +7,14 @@ import { Switch } from "@/components/ui/Switch";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { signOutUser } from "@/lib/auth";
+import { clearAuthCookie } from "@/lib/cookie";
+import { useUser } from "@/hooks/useUser";
 
 export default function SettingsPage() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [deadlineReminders, setDeadlineReminders] = useState(true);
   const { showToast } = useToast();
+  const { displayName, email, initials } = useUser();
 
   const handleSave = () => {
     showToast({
@@ -23,7 +26,7 @@ export default function SettingsPage() {
 
   const handleSignOut = async () => {
     await signOutUser();
-    document.cookie = "auth=; path=/; max-age=0";
+    clearAuthCookie();
     window.location.href = "/auth/sign-in";
   };
 
@@ -74,14 +77,14 @@ export default function SettingsPage() {
 
         <Card className="space-y-4 p-4">
           <h3 className="text-sm font-semibold font-heading">Account</h3>
-          <p className="text-xs text-[var(--muted)]">
-            In this base UI, account details come from Firebase Auth.
-          </p>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[var(--muted-2)]">Email</span>
-            <span className="font-medium text-[var(--text)]">
-              (from Firebase)
-            </span>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-br from-amber-400 to-orange-500 text-sm font-bold text-black shrink-0">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium">{displayName || "No name set"}</p>
+              <p className="truncate text-[10px] text-[var(--muted-2)]">{email || "No email"}</p>
+            </div>
           </div>
           <Button
             type="button"

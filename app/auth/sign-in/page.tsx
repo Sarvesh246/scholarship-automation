@@ -2,11 +2,12 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Divider } from "@/components/ui/Divider";
 import { signInWithEmail, signInWithGoogle } from "@/lib/auth";
+import { setAuthCookie } from "@/lib/cookie";
 import { useToast } from "@/components/ui/Toast";
 
 export default function SignInPage() {
@@ -14,18 +15,20 @@ export default function SignInPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showToast } = useToast();
+
+  const redirectTo = searchParams?.get("from") || "/app/dashboard";
 
   const handleEmailSignIn = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       await signInWithEmail(email, password);
-      document.cookie = "auth=1; path=/";
-      router.push("/app/dashboard");
+      setAuthCookie();
+      router.push(redirectTo);
       showToast({ title: "Welcome back", variant: "success" });
-    } catch (error) {
-      console.error(error);
+    } catch {
       showToast({
         title: "Sign-in failed",
         message: "Check your credentials and try again.",
@@ -40,16 +43,37 @@ export default function SignInPage() {
     setLoading(true);
     try {
       await signInWithGoogle();
-      document.cookie = "auth=1; path=/";
-      router.push("/app/dashboard");
+      setAuthCookie();
+      router.push(redirectTo);
       showToast({ title: "Signed in with Google", variant: "success" });
-    } catch (error) {
-      console.error(error);
-      showToast({
-        title: "Google sign-in failed",
-        message: "Please try again.",
-        variant: "danger"
-      });
+    } catch (err: unknown) {
+      // Firebase Auth errors: { code: "auth/...", message: "..." }; sometimes wrapped
+      const obj = err && typeof err === "object" ? err as Record<string, unknown> : {};
+      const code = (obj.code ?? obj.error?.code ?? "") as string;
+      const msg = (obj.message ?? obj.error?.message ?? "") as string;
+      const detail = code ? `${code}${msg ? `: ${msg}` : ""}` : msg || (err instanceof Error ? err.message : String(err));
+      if (typeof window !== "undefined") {
+        console.error("[Google sign-in]", detail, err);
+      }
+      if (code === "auth/unauthorized-domain") {
+        showToast({
+          title: "Google sign-in failed",
+          message: "This domain is not authorized. Add scholarship-automation.vercel.app in Firebase → Auth → Authorized domains.",
+          variant: "danger"
+        });
+      } else if (code === "auth/popup-blocked") {
+        showToast({
+          title: "Popup blocked",
+          message: "Allow popups for this site and try again.",
+          variant: "danger"
+        });
+      } else {
+        showToast({
+          title: "Google sign-in failed",
+          message: detail || "Please try again.",
+          variant: "danger"
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -124,7 +148,7 @@ export default function SignInPage() {
       </p>
 
       <p className="text-[10px] text-[var(--muted-2)]">
-        By signing in, you agree to our placeholder Terms and Privacy Policy.
+        By signing in, you agree to our ApplyPilot Terms and Privacy Policy.
       </p>
     </div>
   );

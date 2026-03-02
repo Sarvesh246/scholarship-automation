@@ -1,0 +1,30 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: user can only access their own document
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Scholarships — read-only for signed-in users
+    match /scholarships/{scholarshipId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // User profile and all subcollections — full access for own data only
+    match /users/{userId} {
+      allow read, create, update, delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/applications/{applicationId} {
+      allow read, create, update, delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/essays/{essayId} {
+      allow read, create, update, delete: if isOwner(userId);
+    }
+  }
+}

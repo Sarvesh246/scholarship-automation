@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { PipelineBoard } from "@/components/feature/PipelineBoard";
 import { DeadlineList } from "@/components/feature/DeadlineList";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { getApplications } from "@/lib/applicationStorage";
-import { scholarships } from "@/data/mockData";
+import { getScholarships } from "@/lib/scholarshipStorage";
+import type { Application, Scholarship } from "@/types";
 
 function getDeadlinesForNextDays<T extends { deadline: string }>(
   applicationDeadlines: T[],
@@ -24,65 +26,92 @@ function getDeadlinesForNextDays<T extends { deadline: string }>(
 }
 
 export default function DashboardPage() {
-  const [applications, setApplications] = useState(() => getApplications());
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [scholarships, setScholarships] = useState<Scholarship[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const loadApplications = () => setApplications(getApplications());
-
-  useEffect(() => {
-    loadApplications();
+  const loadData = useCallback(async () => {
+    const [apps, schols] = await Promise.all([getApplications(), getScholarships()]);
+    setApplications(apps);
+    setScholarships(schols);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    const onFocus = () => loadApplications();
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const onFocus = () => { loadData(); };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, []);
+  }, [loadData]);
 
   type DeadlineStatus = "not_started" | "in_progress" | "submitted";
   type AppDeadline = { id: string; title: string; scholarshipId: string; deadline: string; status: DeadlineStatus };
 
-  const applicationDeadlines: AppDeadline[] = applications.map((app) => {
-    const s = scholarships.find((sch) => sch.id === app.scholarshipId);
-    const deadlineStatus: DeadlineStatus =
-      app.status === "submitted"
-        ? "submitted"
-        : app.status === "drafting" || app.status === "reviewing"
-          ? "in_progress"
-          : "not_started";
-    return {
-      id: app.id,
-      title: s?.title ?? "Application",
-      scholarshipId: app.scholarshipId,
-      deadline: s?.deadline ?? "",
-      status: deadlineStatus
-    };
-  }).filter((d) => d.deadline);
+  const applicationDeadlines: AppDeadline[] = useMemo(
+    () =>
+      applications
+        .map((app) => {
+          const s = scholarships.find((sch) => sch.id === app.scholarshipId);
+          const deadlineStatus: DeadlineStatus =
+            app.status === "submitted"
+              ? "submitted"
+              : app.status === "drafting" || app.status === "reviewing"
+                ? "in_progress"
+                : "not_started";
+          return {
+            id: app.id,
+            title: s?.title ?? "Application",
+            scholarshipId: app.scholarshipId,
+            deadline: s?.deadline ?? "",
+            status: deadlineStatus
+          };
+        })
+        .filter((d) => d.deadline),
+    [applications, scholarships]
+  );
 
-  const deadlinesThisWeek = getDeadlinesForNextDays(applicationDeadlines, 7);
+  const deadlinesThisWeek = useMemo(
+    () => getDeadlinesForNextDays(applicationDeadlines, 7),
+    [applicationDeadlines]
+  );
 
-  const inProgress = applications.filter((a) => a.status !== "submitted").length;
+  const inProgress = useMemo(
+    () => applications.filter((a) => a.status !== "submitted").length,
+    [applications]
+  );
   const dueSoon = deadlinesThisWeek.length;
-  const estimatedSum = applications
-    .filter((a) => a.status !== "not_started" && a.status !== "submitted")
-    .reduce((sum, a) => {
-      const s = scholarships.find((sch) => sch.id === a.scholarshipId);
-      return sum + (s?.amount ?? 0);
-    }, 0);
+  const estimatedSum = useMemo(
+    () =>
+      applications
+        .filter((a) => a.status !== "not_started" && a.status !== "submitted")
+        .reduce((sum, a) => {
+          const s = scholarships.find((sch) => sch.id === a.scholarshipId);
+          return sum + (s?.amount ?? 0);
+        }, 0),
+    [applications, scholarships]
+  );
 
   const matchedCount = applications.length;
 
-  const pipelineCards = applications.map((app) => {
-    const scholarship = scholarships.find((s) => s.id === app.scholarshipId);
-    return {
-      id: app.id,
-      title: scholarship?.title ?? "Application",
-      amount: scholarship?.amount,
-      deadline: scholarship?.deadline,
-      status: app.status,
-      progress: app.progress,
-      nextTask: app.nextTask
-    };
-  });
+  const pipelineCards = useMemo(
+    () =>
+      applications.map((app) => {
+        const scholarship = scholarships.find((s) => s.id === app.scholarshipId);
+        return {
+          id: app.id,
+          title: scholarship?.title ?? "Application",
+          amount: scholarship?.amount,
+          deadline: scholarship?.deadline,
+          status: app.status,
+          progress: app.progress,
+          nextTask: app.nextTask
+        };
+      }),
+    [applications, scholarships]
+  );
 
   const today = new Date();
   const todayGroup = {
@@ -153,6 +182,20 @@ export default function DashboardPage() {
     }
   ];
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <div className="grid gap-4 md:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-20 rounded-2xl" />
+          ))}
+        </div>
+        <Skeleton className="h-48 rounded-2xl" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -172,7 +215,7 @@ export default function DashboardPage() {
         {statCards.map((stat) => (
           <Card key={stat.label} className="p-4">
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 ${stat.iconBg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+              <div className={`w-10 h-10 ${stat.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
                 {stat.icon}
               </div>
               <div>
@@ -184,21 +227,20 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <div className="space-y-3">
-          <h2 className="text-sm font-medium text-[var(--muted)]">
-            Applications pipeline
-          </h2>
-          <PipelineBoard applications={pipelineCards} />
-        </div>
-        <div className="space-y-3">
-          <h2 className="text-sm font-medium text-[var(--muted)]">
-            Upcoming deadlines
-          </h2>
-          <DeadlineList
-            groups={[todayGroup, thisWeekGroup, nextTwoWeeksGroup]}
-          />
-        </div>
+      <div className="space-y-3">
+        <h2 className="text-sm font-medium text-[var(--muted)]">
+          Applications pipeline
+        </h2>
+        <PipelineBoard applications={pipelineCards} />
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-sm font-medium text-[var(--muted)]">
+          Upcoming deadlines
+        </h2>
+        <DeadlineList
+          groups={[todayGroup, thisWeekGroup, nextTwoWeeksGroup]}
+        />
       </div>
     </div>
   );

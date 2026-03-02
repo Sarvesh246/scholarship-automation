@@ -2,11 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    optimizePackageImports: [
-      "react",
-      "react-dom"
-    ]
-  }
+    turbopackFileSystemCacheForDev: true,
+  },
 };
 
 export default nextConfig;

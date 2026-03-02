@@ -6,31 +6,51 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Divider } from "@/components/ui/Divider";
-import { signInWithGoogle, signUpWithEmail } from "@/lib/auth";
+import { signInWithGoogle, signUpWithEmail, updateUserDisplayName } from "@/lib/auth";
+import { setAuthCookie } from "@/lib/cookie";
 import { useToast } from "@/components/ui/Toast";
 
 export default function SignUpPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { showToast } = useToast();
 
   const handleEmailSignUp = async (e: FormEvent) => {
     e.preventDefault();
+    if (!termsAccepted) {
+      showToast({
+        title: "Terms required",
+        message: "Please accept the Terms and Privacy Policy to continue.",
+        variant: "danger"
+      });
+      return;
+    }
+    if (password.length < 8) {
+      showToast({
+        title: "Password too short",
+        message: "Password must be at least 8 characters.",
+        variant: "danger"
+      });
+      return;
+    }
     setLoading(true);
     try {
       await signUpWithEmail(email, password);
-      document.cookie = "auth=1; path=/";
+      if (name.trim()) {
+        await updateUserDisplayName(name.trim());
+      }
+      setAuthCookie();
       router.push("/app/dashboard");
       showToast({
         title: "Account created",
         message: "Welcome to your scholarship workspace.",
         variant: "success"
       });
-    } catch (error) {
-      console.error(error);
+    } catch {
       showToast({
         title: "Sign-up failed",
         message: "Please check your details and try again.",
@@ -45,14 +65,13 @@ export default function SignUpPage() {
     setLoading(true);
     try {
       await signInWithGoogle();
-      document.cookie = "auth=1; path=/";
+      setAuthCookie();
       router.push("/app/dashboard");
       showToast({
         title: "Signed up with Google",
         variant: "success"
       });
-    } catch (error) {
-      console.error(error);
+    } catch {
       showToast({
         title: "Google sign-up failed",
         message: "Please try again.",
@@ -87,8 +106,9 @@ export default function SignUpPage() {
       <form onSubmit={handleEmailSignUp} className="space-y-4">
         <Input
           name="name"
-          label="Name"
+          label="Full name"
           autoComplete="name"
+          required
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -101,19 +121,30 @@ export default function SignUpPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <Input
-          type="password"
-          name="password"
-          label="Password"
-          autoComplete="new-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <div>
+          <Input
+            type="password"
+            name="password"
+            label="Password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <p className="mt-1 text-[10px] text-[var(--muted-2)]">At least 8 characters.</p>
+        </div>
         <div className="flex items-center gap-2 text-[10px] text-[var(--muted-2)]">
-          <input id="terms" type="checkbox" className="h-3 w-3 rounded border-[var(--border)]" />
+          <input
+            id="terms"
+            type="checkbox"
+            required
+            checked={termsAccepted}
+            onChange={(e) => setTermsAccepted(e.target.checked)}
+            className="h-3 w-3 rounded border-[var(--border)]"
+          />
           <label htmlFor="terms">
-            I agree to the placeholder Terms and Privacy Policy.
+            I agree to the ApplyPilot Terms and Privacy Policy.
           </label>
         </div>
         <Button

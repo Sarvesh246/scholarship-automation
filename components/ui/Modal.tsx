@@ -1,6 +1,5 @@
 import { ReactNode } from "react";
 import { Button } from "./Button";
-import { cn } from "@/lib/utils";
 
 interface ModalProps {
   open: boolean;
@@ -9,8 +8,11 @@ interface ModalProps {
   primaryLabel?: string;
   secondaryLabel?: string;
   onClose: () => void;
-  onPrimary?: () => void;
+  onPrimary?: () => void | Promise<void>;
   onSecondary?: () => void;
+  /** If true (default), modal closes immediately when primary is clicked. If false, caller must call onClose() after onPrimary completes (e.g. for async submit). */
+  closeOnPrimaryClick?: boolean;
+  primaryDisabled?: boolean;
   destructive?: boolean;
   children?: ReactNode;
 }
@@ -24,20 +26,33 @@ export function Modal({
   onClose,
   onPrimary,
   onSecondary,
+  closeOnPrimaryClick = true,
+  primaryDisabled,
   destructive,
   children
 }: ModalProps) {
   if (!open) return null;
 
+  const handlePrimary = async () => {
+    await onPrimary?.();
+    if (closeOnPrimaryClick) onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-lg">
-        <h2 className="text-sm font-semibold font-heading">{title}</h2>
-        {description && (
-          <p className="mt-1 text-xs text-[var(--muted)]">{description}</p>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4 py-6">
+      <div className="flex max-h-[90vh] w-full max-w-md flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-lg">
+        <div className="shrink-0 px-6 pt-6">
+          <h2 className="text-sm font-semibold font-heading">{title}</h2>
+          {description && (
+            <p className="mt-1 text-xs text-[var(--muted)]">{description}</p>
+          )}
+        </div>
+        {children && (
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-4 text-sm">
+            {children}
+          </div>
         )}
-        {children && <div className="mt-4 text-sm">{children}</div>}
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="shrink-0 flex justify-end gap-3 border-t border-[var(--border)] px-6 py-4">
           <Button
             type="button"
             variant="secondary"
@@ -54,9 +69,9 @@ export function Modal({
             size="sm"
             variant={destructive ? "destructive" : "primary"}
             onClick={() => {
-              onPrimary?.();
-              onClose();
+              handlePrimary();
             }}
+            disabled={primaryDisabled}
           >
             {primaryLabel}
           </Button>

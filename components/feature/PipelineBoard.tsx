@@ -1,3 +1,5 @@
+import { memo } from "react";
+import Link from "next/link";
 import { ApplicationStatus } from "@/types";
 import { cn } from "@/lib/utils";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -25,11 +27,17 @@ function formatDeadline(deadline?: string) {
   });
 }
 
-function ApplicationCard({ card }: { card: PipelineCardData }) {
-  return (
-    <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-xs shadow-sm transition-all hover:-translate-y-1 hover:border-amber-500/30 hover:shadow-md">
-      <p className="text-xs font-semibold leading-snug">{card.title}</p>
-      <div className="flex items-center gap-2 text-[10px] text-[var(--muted-2)]">
+const ApplicationCard = memo(function ApplicationCard({
+  card,
+  href
+}: {
+  card: PipelineCardData;
+  href?: string;
+}) {
+  const content = (
+    <>
+      <p className="text-sm font-semibold leading-snug">{card.title}</p>
+      <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-[var(--muted-2)]">
         {card.amount && (
           <span className="text-amber-400 font-medium">{formatAmount(card.amount)}</span>
         )}
@@ -42,15 +50,32 @@ function ApplicationCard({ card }: { card: PipelineCardData }) {
           Next: {card.nextTask}
         </p>
       </div>
-    </div>
+    </>
   );
-}
+
+  const className = cn(
+    "space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3.5 text-xs shadow-sm transition-all hover:-translate-y-1 hover:border-amber-500/30 hover:shadow-md",
+    href && "cursor-pointer block text-left"
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
+});
 
 interface PipelineBoardProps {
   applications: PipelineCardData[];
+  /** When provided, each card links to this path (receives application id). Omit on dashboard to keep cards non-clickable. */
+  getCardHref?: (applicationId: string) => string;
 }
 
-export function PipelineBoard({ applications }: PipelineBoardProps) {
+export function PipelineBoard({ applications, getCardHref }: PipelineBoardProps) {
   const columns: { title: string; status: ApplicationStatus }[] = [
     { title: "Not started", status: "not_started" },
     { title: "Drafting", status: "drafting" },
@@ -59,11 +84,11 @@ export function PipelineBoard({ applications }: PipelineBoardProps) {
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-4">
+    <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
       {columns.map((column) => (
         <div
           key={column.status}
-          className="flex flex-col gap-3 rounded-xl bg-[var(--bg-secondary)] p-3"
+          className="flex flex-col gap-3 rounded-xl bg-[var(--bg-secondary)] p-3 min-w-0"
         >
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium text-[var(--muted)]">
@@ -77,7 +102,11 @@ export function PipelineBoard({ applications }: PipelineBoardProps) {
             {applications
               .filter((a) => a.status === column.status)
               .map((card) => (
-                <ApplicationCard key={card.id} card={card} />
+                <ApplicationCard
+                  key={card.id}
+                  card={card}
+                  href={getCardHref?.(card.id)}
+                />
               ))}
             {applications.filter((a) => a.status === column.status).length ===
               0 && (

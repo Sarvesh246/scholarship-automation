@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { onAuthChanged } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -12,17 +12,19 @@ interface AuthGateProps {
 export function AuthGate({ children }: AuthGateProps) {
   const [checking, setChecking] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const unsubscribe = onAuthChanged((user) => {
       if (!user) {
-        router.replace("/auth/sign-in");
+        const target = `/auth/sign-in?from=${encodeURIComponent(pathname ?? "/app/dashboard")}`;
+        router.replace(target);
       } else {
         setChecking(false);
       }
     });
     return () => unsubscribe();
-  }, [router]);
+  }, [router, pathname]);
 
   if (checking) {
     return (

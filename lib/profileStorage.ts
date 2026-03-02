@@ -1,6 +1,6 @@
 import type { Profile } from "@/types";
-
-const STORAGE_KEY = "scholarship-app-profile";
+import { auth, db } from "./firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 const defaultProfile: Profile = {
   academics: {},
@@ -9,37 +9,37 @@ const defaultProfile: Profile = {
   financial: {}
 };
 
-function getStored(): Profile {
-  if (typeof window === "undefined") return defaultProfile;
+export async function getProfile(): Promise<Profile> {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return defaultProfile;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultProfile;
-    const parsed = JSON.parse(raw) as Profile;
+    const snap = await getDoc(doc(db, "users", uid));
+    if (!snap.exists()) return defaultProfile;
+    const data = snap.data();
     return {
-      academics: parsed.academics ?? defaultProfile.academics,
-      activities: Array.isArray(parsed.activities) ? parsed.activities : defaultProfile.activities,
-      awards: Array.isArray(parsed.awards) ? parsed.awards : defaultProfile.awards,
-      demographics: parsed.demographics,
-      financial: parsed.financial ?? defaultProfile.financial
+      academics: data.academics ?? defaultProfile.academics,
+      activities: Array.isArray(data.activities) ? data.activities : defaultProfile.activities,
+      awards: Array.isArray(data.awards) ? data.awards : defaultProfile.awards,
+      demographics: data.demographics,
+      financial: data.financial ?? defaultProfile.financial
     };
   } catch {
     return defaultProfile;
   }
 }
 
-/**
- * Get the current profile from localStorage.
- */
-export function getProfile(): Profile {
-  return getStored();
-}
-
-/**
- * Save the full profile to localStorage.
- */
-export function saveProfile(profile: Profile): void {
-  if (typeof window === "undefined") return;
+export async function saveProfile(profile: Profile): Promise<void> {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-  } catch (_) {}
+    await setDoc(doc(db, "users", uid), {
+      academics: profile.academics ?? {},
+      activities: profile.activities ?? [],
+      awards: profile.awards ?? [],
+      demographics: profile.demographics ?? {},
+      financial: profile.financial ?? {}
+    }, { merge: true });
+  } catch {
+    /* write failed */
+  }
 }

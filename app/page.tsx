@@ -115,6 +115,10 @@ function useCounterAnimation(ref: React.RefObject<HTMLDivElement | null>) {
             const counters = entry.target.querySelectorAll("[data-target]");
             counters.forEach((el) => {
               const target = parseInt(el.getAttribute("data-target") || "0");
+              if (target === 0) {
+                el.textContent = "0";
+                return;
+              }
               const suffix = target === 89 ? "%" : "+";
               const duration = 2000;
               const startTime = performance.now();
@@ -311,7 +315,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 shadow-md">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-linear-to-br from-amber-500 to-orange-600 shadow-md">
                 <svg className="w-5 h-5 text-black" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                 </svg>
@@ -372,7 +376,7 @@ export default function LandingPage() {
             <div className="reveal">
               <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-4 py-2 mb-6">
                 <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-                <span className="text-amber-400 text-sm font-medium">Over $2.4M in scholarships available</span>
+                <span className="text-amber-400 text-sm font-medium">Your scholarship co-pilot, launching soon</span>
               </div>
 
               <h1 className="hero-title font-heading mb-6">
@@ -403,17 +407,24 @@ export default function LandingPage() {
               {/* Stats */}
               <div ref={statsRef} className="grid grid-cols-3 gap-6">
                 <div>
-                  <div className="stat-number" data-target="15000">0</div>
-                  <div className="text-gray-500 text-sm">Active Scholarships</div>
+                  <div className="stat-number" data-target="0">0</div>
+                  <div className="text-gray-500 text-sm">Scholarships Listed</div>
                 </div>
                 <div>
-                  <div className="stat-number" data-target="98000">0</div>
-                  <div className="text-gray-500 text-sm">Students Helped</div>
+                  <div className="stat-number" data-target="0">0</div>
+                  <div className="text-gray-500 text-sm">Applications Sent</div>
                 </div>
                 <div>
-                  <div className="stat-number" data-target="89">0</div>
-                  <div className="text-gray-500 text-sm">Success Rate</div>
+                  <div className="stat-number" data-target="0">0</div>
+                  <div className="text-gray-500 text-sm">Awards Won</div>
                 </div>
+              </div>
+              <div className="flex items-center gap-1.5 mt-4">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-[11px] text-[var(--muted-2)]">Stats update live as the community grows</span>
               </div>
             </div>
 
@@ -461,7 +472,7 @@ export default function LandingPage() {
               </div>
 
               {/* Floating Badge */}
-              <div className="absolute -top-4 -right-4 bg-gradient-to-br from-amber-500 to-amber-600 text-black px-4 py-2 rounded-lg shadow-lg transform rotate-3">
+              <div className="absolute -top-4 -right-4 bg-linear-to-br from-amber-500 to-amber-600 text-black px-4 py-2 rounded-lg shadow-lg transform rotate-3">
                 <div className="text-xs font-medium">NEW MATCH</div>
                 <div className="text-lg font-bold font-heading">$15,000</div>
               </div>
@@ -488,7 +499,7 @@ export default function LandingPage() {
           {/* Search Bar */}
           <div className="max-w-3xl mx-auto mb-8 reveal">
             <div className="search-box flex items-center gap-4">
-              <svg className="w-5 h-5 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -529,7 +540,7 @@ export default function LandingPage() {
       </section>
 
       {/* How It Works */}
-      <section id="how-it-works" className="relative py-20 bg-gradient-to-b from-transparent via-amber-950/5 to-transparent">
+      <section id="how-it-works" className="relative py-20 bg-linear-to-b from-transparent via-amber-950/5 to-transparent">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16 reveal">
             <h2 className="text-3xl md:text-4xl font-bold font-heading mb-4">Your Journey in 4 Simple Steps</h2>
@@ -575,7 +586,7 @@ export default function LandingPage() {
                   { title: "Analytics & Insights", desc: "Understand your chances and optimize your profile for better matches.", iconBg: "bg-blue-500/20", iconColor: "text-blue-400", icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" }
                 ].map((feature) => (
                   <div key={feature.title} className="flex items-start gap-4">
-                    <div className={`w-10 h-10 ${feature.iconBg} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                    <div className={`w-10 h-10 ${feature.iconBg} rounded-lg flex items-center justify-center shrink-0`}>
                       <svg className={`w-5 h-5 ${feature.iconColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={feature.icon} />
                       </svg>
@@ -641,7 +652,7 @@ export default function LandingPage() {
       </section>
 
       {/* TODO: Testimonials section — re-enable once we have real success stories
-      <section id="testimonials" className="relative py-20 bg-gradient-to-b from-transparent via-emerald-950/5 to-transparent">
+      <section id="testimonials" className="relative py-20 bg-linear-to-b from-transparent via-emerald-950/5 to-transparent">
         ...
       </section>
       */}
@@ -649,8 +660,8 @@ export default function LandingPage() {
       {/* CTA Section */}
       <section className="relative py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="reveal bg-gradient-to-br from-amber-500/10 to-orange-500/5 border border-amber-500/20 rounded-3xl p-8 md:p-12 text-center relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent" />
+          <div className="reveal bg-linear-to-br from-amber-500/10 to-orange-500/5 border border-amber-500/20 rounded-3xl p-8 md:p-12 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-linear-to-br from-amber-500/5 to-transparent" />
             <div className="relative z-10">
               <h2 className="text-3xl md:text-4xl font-bold font-heading mb-4">Start Your Scholarship Journey Today</h2>
               <p className="text-gray-400 mb-8 max-w-2xl mx-auto">Your calm, structured workspace for scholarship applications. Create your free profile in under 5 minutes.</p>
@@ -670,7 +681,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-amber-500 to-orange-600">
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-linear-to-br from-amber-500 to-orange-600">
                   <svg className="w-3.5 h-3.5 text-black" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                   </svg>
@@ -690,33 +701,33 @@ export default function LandingPage() {
             <div>
               <h4 className="font-semibold mb-4 text-sm">Company</h4>
               <ul className="space-y-2 text-sm text-gray-500">
-                <li><a href="#" className="hover:text-amber-400 transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-amber-400 transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-amber-400 transition-colors">Press</a></li>
-                <li><a href="#" className="hover:text-amber-400 transition-colors">Contact</a></li>
+                <li><span className="cursor-default">About Us</span></li>
+                <li><span className="cursor-default">Careers</span></li>
+                <li><span className="cursor-default">Press</span></li>
+                <li><span className="cursor-default">Contact</span></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4 text-sm">Legal</h4>
               <ul className="space-y-2 text-sm text-gray-500">
-                <li><a href="#" className="hover:text-amber-400 transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-amber-400 transition-colors">Terms of Service</a></li>
-                <li><a href="#" className="hover:text-amber-400 transition-colors">Cookie Policy</a></li>
+                <li><span className="cursor-default">Privacy Policy</span></li>
+                <li><span className="cursor-default">Terms of Service</span></li>
+                <li><span className="cursor-default">Cookie Policy</span></li>
               </ul>
             </div>
           </div>
           <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} ApplyPilot. All rights reserved.</p>
             <div className="flex gap-4">
-              <a href="#" className="text-gray-500 hover:text-amber-400 transition-colors" aria-label="Twitter">
+              <span className="text-gray-500" aria-label="Twitter">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84" /></svg>
-              </a>
-              <a href="#" className="text-gray-500 hover:text-amber-400 transition-colors" aria-label="LinkedIn">
+              </span>
+              <span className="text-gray-500" aria-label="LinkedIn">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" /></svg>
-              </a>
-              <a href="#" className="text-gray-500 hover:text-amber-400 transition-colors" aria-label="Instagram">
+              </span>
+              <span className="text-gray-500" aria-label="Instagram">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" /></svg>
-              </a>
+              </span>
             </div>
           </div>
         </div>

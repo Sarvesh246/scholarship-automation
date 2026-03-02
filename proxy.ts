@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const PROTECTED_PREFIX = "/app/";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith(PROTECTED_PREFIX)) {
@@ -21,4 +21,3 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: ["/app/:path*"]
 };
-

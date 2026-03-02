@@ -1,3 +1,4 @@
+import { memo } from "react";
 import Link from "next/link";
 import { Essay } from "@/types";
 import { Tag } from "@/components/ui/Tag";
@@ -6,7 +7,7 @@ interface EssayCardProps {
   essay: Essay;
 }
 
-export function EssayCard({ essay }: EssayCardProps) {
+export const EssayCard = memo(function EssayCard({ essay }: EssayCardProps) {
   const updated = new Date(essay.updatedAt).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric"
@@ -33,4 +34,4 @@ export function EssayCard({ essay }: EssayCardProps) {
       </p>
     </Link>
   );
-}
+});

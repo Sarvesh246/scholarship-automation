@@ -9,7 +9,7 @@ export default function PricingPage() {
       <div className="mx-auto flex max-w-4xl flex-col px-6 pb-16 pt-10 relative z-10">
         <header className="flex items-center justify-between gap-4 pb-10">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 shadow-md">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-amber-500 to-orange-600 shadow-md">
               <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
               </svg>
@@ -78,11 +78,11 @@ export default function PricingPage() {
           </div>
 
           <div className="rounded-2xl bg-[var(--surface)] p-6 shadow-md border border-amber-500/20 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-600 to-amber-400" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-amber-600 to-amber-400" />
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-400">
               Pro (coming soon)
             </p>
-            <p className="mt-2 text-3xl font-bold font-heading">$8</p>
+            <p className="mt-2 text-3xl font-bold font-heading">$10</p>
             <p className="mt-1 text-xs text-[var(--muted)]">Per month.</p>
             <ul className="mt-4 space-y-2 text-sm text-[var(--muted)]">
               <li className="flex items-center gap-2">

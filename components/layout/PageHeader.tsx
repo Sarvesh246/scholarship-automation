@@ -19,7 +19,7 @@ export function PageHeader({ title, subtitle, primaryAction }: PageHeaderProps) 
           </p>
         )}
       </div>
-      {primaryAction && <div className="flex-shrink-0">{primaryAction}</div>}
+      {primaryAction && <div className="shrink-0">{primaryAction}</div>}
     </div>
   );
 }

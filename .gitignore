@@ -8,7 +8,7 @@ node_modules
 /coverage
 
 # next.js
-/.next/
+.next
 /out/
 
 # production
@@ -26,6 +26,9 @@ yarn-error.log*
 # local env files
 .env*.local
 .env
+
+# Firebase service account key — never commit; rotate in Console if exposed
+scripts/serviceAccountKey.json
 
 # vercel
 .vercel

@@ -6,8 +6,11 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { getProfile, saveProfile } from "@/lib/profileStorage";
+import { updateUserDisplayName } from "@/lib/auth";
+import { useUser } from "@/hooks/useUser";
 import type { Profile } from "@/types";
 
 function computeCompletion(p: Profile): number {
@@ -25,25 +28,35 @@ function computeCompletion(p: Profile): number {
 
 export default function ProfilePage() {
   const { showToast } = useToast();
+  const { displayName, email, initials } = useUser();
+  const [fullName, setFullName] = useState("");
   const [academics, setAcademics] = useState({ gpa: "", major: "", graduationYear: "" });
   const [activities, setActivities] = useState<{ id: string; name: string; role: string }[]>([]);
   const [awards, setAwards] = useState<{ id: string; name: string; year: string }[]>([]);
   const [financial, setFinancial] = useState<Record<string, string>>({ context: "" });
-
-  const loadProfile = () => {
-    const p = getProfile();
-    setAcademics({
-      gpa: p.academics?.gpa ?? "",
-      major: p.academics?.major ?? "",
-      graduationYear: p.academics?.graduationYear ?? ""
-    });
-    setActivities(Array.isArray(p.activities) ? p.activities : []);
-    setAwards(Array.isArray(p.awards) ? p.awards : []);
-    setFinancial(p.financial && Object.keys(p.financial).length > 0 ? p.financial : { context: "" });
-  };
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadProfile();
+    if (displayName) setFullName(displayName);
+  }, [displayName]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const p = await getProfile();
+      if (cancelled) return;
+      setAcademics({
+        gpa: p.academics?.gpa ?? "",
+        major: p.academics?.major ?? "",
+        graduationYear: p.academics?.graduationYear ?? ""
+      });
+      setActivities(Array.isArray(p.activities) ? p.activities : []);
+      setAwards(Array.isArray(p.awards) ? p.awards : []);
+      setFinancial(p.financial && Object.keys(p.financial).length > 0 ? p.financial : { context: "" });
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const profile: Profile = {
@@ -54,11 +67,25 @@ export default function ProfilePage() {
   };
   const completion = Math.min(100, computeCompletion(profile));
 
-  const handleSaveAll = () => {
-    saveProfile(profile);
+  const handleSaveAll = async () => {
+    if (academics.gpa && (isNaN(Number(academics.gpa)) || Number(academics.gpa) < 0 || Number(academics.gpa) > 5)) {
+      showToast({ title: "Invalid GPA", message: "GPA must be a number between 0 and 5.0.", variant: "danger" });
+      return;
+    }
+    const yr = academics.graduationYear;
+    if (yr && (isNaN(Number(yr)) || Number(yr) < 2000 || Number(yr) > 2040)) {
+      showToast({ title: "Invalid year", message: "Graduation year must be between 2000 and 2040.", variant: "danger" });
+      return;
+    }
+    setSaving(true);
+    if (fullName.trim() && fullName.trim() !== displayName) {
+      await updateUserDisplayName(fullName.trim());
+    }
+    await saveProfile(profile);
+    setSaving(false);
     showToast({
       title: "Profile saved",
-      message: "Your profile has been saved locally.",
+      message: "Your profile has been saved.",
       variant: "success"
     });
   };
@@ -87,14 +114,28 @@ export default function ProfilePage() {
     setAwards((prev) => prev.filter((a) => a.id !== id));
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-16 rounded-2xl" />
+        <div className="grid gap-4 md:grid-cols-2">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-48 rounded-2xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Profile"
         subtitle="Share enough context for strong applications."
         primaryAction={
-          <Button type="button" size="sm" onClick={handleSaveAll}>
-            Save profile
+          <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
+            {saving ? "Saving..." : "Save profile"}
           </Button>
         }
       />
@@ -105,6 +146,23 @@ export default function ProfilePage() {
           <p className="text-amber-400">{completion}%</p>
         </div>
         <ProgressBar value={completion} />
+      </Card>
+
+      <Card className="space-y-3 p-4">
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-br from-amber-400 to-orange-500 text-lg font-bold text-black shrink-0">
+            {initials}
+          </div>
+          <div className="flex-1 space-y-2">
+            <Input
+              label="Full name"
+              placeholder="e.g. Jane Doe"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+            />
+            <p className="text-[10px] text-[var(--muted-2)]">{email || "No email on file"}</p>
+          </div>
+        </div>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -130,7 +188,7 @@ export default function ProfilePage() {
             value={academics.graduationYear}
             onChange={(e) => setAcademics((prev) => ({ ...prev, graduationYear: e.target.value }))}
           />
-          <Button type="button" size="sm" onClick={handleSaveAll}>
+          <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
             Save academics
           </Button>
         </Card>
@@ -173,7 +231,7 @@ export default function ProfilePage() {
               ))}
             </div>
           )}
-          <Button type="button" size="sm" onClick={handleSaveAll}>
+          <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
             Save activities
           </Button>
         </Card>
@@ -216,7 +274,7 @@ export default function ProfilePage() {
               ))}
             </div>
           )}
-          <Button type="button" size="sm" onClick={handleSaveAll}>
+          <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
             Save awards
           </Button>
         </Card>
@@ -229,7 +287,7 @@ export default function ProfilePage() {
             value={financial.context ?? ""}
             onChange={(e) => setFinancial((prev) => ({ ...prev, context: e.target.value }))}
           />
-          <Button type="button" size="sm" onClick={handleSaveAll}>
+          <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
             Save financial section
           </Button>
         </Card>

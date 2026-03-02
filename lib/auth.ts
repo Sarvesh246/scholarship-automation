@@ -5,7 +5,8 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signOut
+  signOut,
+  updateProfile
 } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 
@@ -50,5 +51,11 @@ export function onAuthChanged(callback: (user: User | null) => void) {
 
 export function getCurrentUser(): User | null {
   return auth?.currentUser ?? null;
+}
+
+export async function updateUserDisplayName(name: string): Promise<void> {
+  const user = auth?.currentUser;
+  if (!user) return;
+  await updateProfile(user, { displayName: name });
 }
 

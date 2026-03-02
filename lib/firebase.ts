@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
+import { getFirestore, initializeFirestore, type Firestore, memoryLocalCache } from "firebase/firestore";
 import { getAnalytics, type Analytics, isSupported } from "firebase/analytics";
 
 /**
@@ -21,7 +22,7 @@ let app: FirebaseApp | null = null;
 
 function getFirebaseApp(): FirebaseApp | null {
   if (!firebaseConfig.apiKey) {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
       console.warn("[Firebase] Env vars not set. Add .env.local and restart the dev server.");
     }
     return null;
@@ -41,6 +42,17 @@ app = getFirebaseApp();
 
 /** Firebase Auth instance. Null when not in browser or config missing. */
 export const auth: Auth | null = app ? getAuth(app) : (null as unknown as Auth);
+
+/** Firestore instance. Null when not in browser or config missing. */
+export const db: Firestore | null = app
+  ? (() => {
+      try {
+        return initializeFirestore(app, { localCache: memoryLocalCache() });
+      } catch {
+        return getFirestore(app);
+      }
+    })()
+  : null;
 
 export const googleProvider = new GoogleAuthProvider();
 

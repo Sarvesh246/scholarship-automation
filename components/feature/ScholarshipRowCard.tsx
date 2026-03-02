@@ -1,20 +1,28 @@
+import { memo, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Scholarship } from "@/types";
 import { Tag } from "@/components/ui/Tag";
 import { Button } from "@/components/ui/Button";
-import { useState } from "react";
 
 interface Props {
   scholarship: Scholarship;
+  hasApplication?: boolean;
+  onStartApplication?: (scholarship: Scholarship) => Promise<void>;
   onDelete?: () => void;
 }
 
-export function ScholarshipRowCard({ scholarship, onDelete }: Props) {
+export const ScholarshipRowCard = memo(function ScholarshipRowCard({
+  scholarship,
+  hasApplication = false,
+  onStartApplication,
+  onDelete
+}: Props) {
   const [saved, setSaved] = useState(false);
+  const [starting, setStarting] = useState(false);
   const router = useRouter();
 
-  const handleDeleteClick = () => {
+  const handleDeleteClick = useCallback(() => {
     if (!onDelete) return;
 
     const confirmed = window.confirm(
@@ -24,16 +32,25 @@ export function ScholarshipRowCard({ scholarship, onDelete }: Props) {
     if (!confirmed) return;
 
     onDelete();
-  };
+  }, [onDelete, scholarship.title]);
 
   const deadline = new Date(scholarship.deadline).toLocaleDateString(
     undefined,
     { month: "short", day: "numeric", year: "numeric" }
   );
 
-  const handleStart = () => {
-    router.push(`/app/applications/app-${scholarship.id}`);
-  };
+  const handleStart = useCallback(() => {
+    if (hasApplication) {
+      router.push(`/app/applications/${scholarship.id}`);
+      return;
+    }
+    if (onStartApplication) {
+      setStarting(true);
+      onStartApplication(scholarship).finally(() => setStarting(false));
+    } else {
+      router.push(`/app/applications/${scholarship.id}`);
+    }
+  }, [hasApplication, scholarship, onStartApplication, router]);
 
   return (
     <div className="flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 text-sm shadow-sm transition-all hover:-translate-y-1 hover:border-amber-500/30 hover:shadow-lg">
@@ -67,8 +84,9 @@ export function ScholarshipRowCard({ scholarship, onDelete }: Props) {
           type="button"
           size="sm"
           onClick={handleStart}
+          disabled={starting}
         >
-          Start
+          {starting ? "Starting…" : hasApplication ? "Continue" : "Start"}
         </Button>
         <div className="flex items-center gap-3">
           <button
@@ -84,6 +102,7 @@ export function ScholarshipRowCard({ scholarship, onDelete }: Props) {
               type="button"
               className="text-xs text-red-400 hover:text-red-300 transition-colors"
               onClick={handleDeleteClick}
+              aria-label={`Delete ${scholarship.title}`}
             >
               Delete
             </button>
@@ -92,4 +111,4 @@ export function ScholarshipRowCard({ scholarship, onDelete }: Props) {
       </div>
     </div>
   );
-}
+});

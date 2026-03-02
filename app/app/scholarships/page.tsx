@@ -1,18 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { ScholarshipRowCard } from "@/components/feature/ScholarshipRowCard";
-import { scholarships } from "@/data/mockData";
+import { getScholarships } from "@/lib/scholarshipStorage";
+import { getApplications, ensureApplication } from "@/lib/applicationStorage";
+import type { Scholarship } from "@/types";
 
 export default function ScholarshipsPage() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [items, setItems] = useState(scholarships);
+  const [items, setItems] = useState<Scholarship[]>([]);
+  const [applicationIds, setApplicationIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+
+  const loadScholarships = useCallback(async () => {
+    const [data, apps] = await Promise.all([getScholarships(), getApplications()]);
+    setItems(data);
+    setApplicationIds(new Set(apps.map((a) => a.id)));
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadScholarships();
+  }, [loadScholarships]);
 
   const filtered = items.filter((s) =>
     s.title.toLowerCase().includes(query.toLowerCase())
@@ -21,6 +39,29 @@ export default function ScholarshipsPage() {
   const handleDeleteScholarship = (id: string) => {
     setItems((previous) => previous.filter((scholarship) => scholarship.id !== id));
   };
+
+  const handleStartApplication = useCallback(
+    async (scholarship: Scholarship) => {
+      await ensureApplication(scholarship.id);
+      setApplicationIds((prev) => new Set(prev).add(scholarship.id));
+      router.push(`/app/applications/${scholarship.id}`);
+    },
+    [router]
+  );
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-14 rounded-2xl" />
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-24 rounded-2xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -52,13 +93,21 @@ export default function ScholarshipsPage() {
       </div>
 
       <div className="space-y-3">
-        {filtered.map((scholarship) => (
-          <ScholarshipRowCard
-            key={scholarship.id}
-            scholarship={scholarship}
-            onDelete={() => handleDeleteScholarship(scholarship.id)}
-          />
-        ))}
+        {filtered.length === 0 ? (
+          <p className="py-8 text-center text-sm text-[var(--muted)]">
+            No scholarships found. Try a different search or check back later.
+          </p>
+        ) : (
+          filtered.map((scholarship) => (
+            <ScholarshipRowCard
+              key={scholarship.id}
+              scholarship={scholarship}
+              hasApplication={applicationIds.has(scholarship.id)}
+              onStartApplication={handleStartApplication}
+              onDelete={() => handleDeleteScholarship(scholarship.id)}
+            />
+          ))
+        )}
       </div>
 
       <Drawer

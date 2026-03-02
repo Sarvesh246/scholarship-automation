@@ -1,43 +1,65 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/Badge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Tabs } from "@/components/ui/Tabs";
 import { PipelineBoard } from "@/components/feature/PipelineBoard";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { getApplications } from "@/lib/applicationStorage";
-import { scholarships } from "@/data/mockData";
+import { getScholarships } from "@/lib/scholarshipStorage";
+import type { Application, Scholarship } from "@/types";
 
 export default function ApplicationsPage() {
   const [view, setView] = useState<"board" | "list">("board");
-  const [applications, setApplications] = useState(() => getApplications());
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [scholarships, setScholarships] = useState<Scholarship[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const loadApplications = () => setApplications(getApplications());
-
-  useEffect(() => {
-    loadApplications();
+  const loadData = useCallback(async () => {
+    const [apps, schols] = await Promise.all([getApplications(), getScholarships()]);
+    setApplications(apps);
+    setScholarships(schols);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    const onFocus = () => loadApplications();
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const onFocus = () => { loadData(); };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, []);
+  }, [loadData]);
 
-  const cards = applications.map((app) => {
-    const scholarship = scholarships.find((s) => s.id === app.scholarshipId);
-    return {
-      id: app.id,
-      title: scholarship?.title ?? "Application",
-      amount: scholarship?.amount,
-      deadline: scholarship?.deadline,
-      status: app.status,
-      progress: app.progress,
-      nextTask: app.nextTask
-    };
-  });
+  const cards = useMemo(
+    () =>
+      applications.map((app) => {
+        const scholarship = scholarships.find((s) => s.id === app.scholarshipId);
+        return {
+          id: app.id,
+          title: scholarship?.title ?? "Application",
+          amount: scholarship?.amount,
+          deadline: scholarship?.deadline,
+          status: app.status,
+          progress: app.progress,
+          nextTask: app.nextTask
+        };
+      }),
+    [applications, scholarships]
+  );
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-48 rounded-2xl" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -69,7 +91,10 @@ export default function ApplicationsPage() {
       </div>
 
       {view === "board" ? (
-        <PipelineBoard applications={cards} />
+        <PipelineBoard
+          applications={cards}
+          getCardHref={(id) => `/app/applications/${id}`}
+        />
       ) : (
         <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 text-xs">
           {applications.map((app) => {

@@ -1,94 +1,119 @@
 import type { Application } from "@/types";
-import { applications as defaultApplications } from "@/data/mockData";
+import { auth, db } from "./firebase";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  getDocFromServer,
+  setDoc,
+  updateDoc
+} from "firebase/firestore";
 
-const STORAGE_KEY = "applypilot-applications";
+const isDev = process.env.NODE_ENV === "development";
 
-function getStored(): Application[] {
-  if (typeof window === "undefined") return [];
+function getUserApplicationsRef() {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) {
+    if (isDev) console.warn("[applicationStorage] db or uid missing", { db: !!db, uid });
+    return null;
+  }
+  return collection(db, "users", uid, "applications");
+}
+
+export async function getApplications(): Promise<Application[]> {
+  const ref = getUserApplicationsRef();
+  if (!ref) return [];
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Application[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
+    const snap = await getDocs(ref);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Application);
+  } catch (err) {
+    if (isDev) console.error("[applicationStorage] getApplications failed:", err);
     return [];
   }
 }
 
-function setStored(list: Application[]) {
-  if (typeof window === "undefined") return;
+export async function getApplication(id: string): Promise<Application | null> {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return null;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-  } catch (_) {}
-}
-
-/**
- * Get all applications: from localStorage, or seed from mock data once.
- */
-export function getApplications(): Application[] {
-  const stored = getStored();
-  if (stored.length > 0) return stored;
-  setStored(defaultApplications);
-  return defaultApplications;
-}
-
-/**
- * Get one application by id.
- */
-export function getApplication(id: string): Application | null {
-  const list = getApplications();
-  return list.find((a) => a.id === id) ?? null;
-}
-
-/**
- * Add or update an application. If id exists, updates; otherwise appends.
- */
-export function saveApplication(app: Application): Application {
-  const list = getStored().length > 0 ? getStored() : [...defaultApplications];
-  const idx = list.findIndex((a) => a.id === app.id);
-  if (idx >= 0) {
-    list[idx] = app;
-  } else {
-    list.push(app);
+    const snap = await getDoc(doc(db, "users", uid, "applications", id));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() } as Application;
+  } catch (err) {
+    if (isDev) console.error("[applicationStorage] getApplication failed:", err);
+    return null;
   }
-  setStored(list);
+}
+
+export async function saveApplication(app: Application): Promise<Application> {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return app;
+  try {
+    const { id, ...data } = app;
+    await setDoc(doc(db, "users", uid, "applications", id), data);
+  } catch (err) {
+    if (isDev) console.error("[applicationStorage] saveApplication failed:", err);
+  }
   return app;
 }
 
-/**
- * Create a new application for a scholarship (or return existing).
- */
-export function ensureApplication(scholarshipId: string, scholarshipDetails?: { docsRequired?: string[] }): Application {
-  const list = getApplications();
-  const existing = list.find((a) => a.scholarshipId === scholarshipId);
-  if (existing) return existing;
-  const template = defaultApplications.find((a) => a.scholarshipId === scholarshipId);
-  const docsRequired =
-    scholarshipDetails?.docsRequired?.length
-      ? scholarshipDetails.docsRequired
-      : template?.docsRequired ?? ["Transcript", "Resume"];
-  const newApp: Application = {
-    id: `app-${scholarshipId}`,
-    scholarshipId,
-    status: "not_started",
-    progress: 0,
-    nextTask: "Review requirements and prompts",
-    docsRequired,
-    docsUploaded: [],
-    promptResponses: []
-  };
-  list.push(newApp);
-  setStored(list);
-  return newApp;
+export async function ensureApplication(
+  scholarshipId: string,
+  scholarshipDetails?: { docsRequired?: string[] }
+): Promise<Application> {
+  const uid = auth?.currentUser?.uid;
+  const appId = scholarshipId;
+
+  if (!db || !uid) {
+    throw new Error("Not signed in or Firebase not ready. Please wait a moment and try again.");
+  }
+
+  try {
+    const ref = doc(db, "users", uid, "applications", appId);
+    const snap = await getDoc(ref);
+    if (snap.exists()) return { id: snap.id, ...snap.data() } as Application;
+
+    const newApp: Application = {
+      id: appId,
+      scholarshipId,
+      status: "not_started",
+      progress: 0,
+      nextTask: "Review requirements and prompts",
+      docsRequired: scholarshipDetails?.docsRequired?.length
+        ? scholarshipDetails.docsRequired
+        : ["Transcript", "Resume"],
+      docsUploaded: [],
+      promptResponses: []
+    };
+    const { id, ...data } = newApp;
+    await setDoc(ref, data);
+
+    const verify = await getDocFromServer(ref);
+    if (!verify.exists()) {
+      throw new Error("Application could not be saved. Check Firestore security rules.");
+    }
+
+    return newApp;
+  } catch (err) {
+    if (isDev) console.error("[applicationStorage] ensureApplication failed:", err);
+    throw err;
+  }
 }
 
-/**
- * Update application status (e.g. to submitted).
- */
-export function updateApplicationStatus(id: string, status: Application["status"], progress?: number): void {
-  const list = getApplications();
-  const idx = list.findIndex((a) => a.id === id);
-  if (idx < 0) return;
-  list[idx] = { ...list[idx], status, progress: progress ?? list[idx].progress };
-  setStored(list);
+export async function updateApplicationStatus(
+  id: string,
+  status: Application["status"],
+  progress?: number
+): Promise<void> {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return;
+  try {
+    const ref = doc(db, "users", uid, "applications", id);
+    const updates: Record<string, unknown> = { status };
+    if (progress !== undefined) updates.progress = progress;
+    await updateDoc(ref, updates);
+  } catch (err) {
+    if (isDev) console.error("[applicationStorage] updateApplicationStatus failed:", err);
+  }
 }

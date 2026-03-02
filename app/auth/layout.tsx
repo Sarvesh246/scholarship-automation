@@ -1,7 +1,10 @@
 import { ReactNode } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 
-export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Authentication"
+};
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -11,7 +14,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 
       <header className="mx-auto flex w-full max-w-md items-center justify-between pb-10 relative z-10">
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 shadow-md">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-amber-500 to-orange-600 shadow-md">
             <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="currentColor">
               <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
             </svg>

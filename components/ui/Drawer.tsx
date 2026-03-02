@@ -18,7 +18,7 @@ export function Drawer({ open, title, onClose, children }: DrawerProps) {
             type="button"
             onClick={onClose}
             className="text-xs text-[var(--muted)] hover:text-amber-400 transition-colors"
-            aria-label="Close filters"
+            aria-label={`Close ${title}`}
           >
             Close
           </button>

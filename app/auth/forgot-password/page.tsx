@@ -22,8 +22,7 @@ export default function ForgotPasswordPage() {
         message: "Check your inbox for a password reset email.",
         variant: "success"
       });
-    } catch (error) {
-      console.error(error);
+    } catch {
       showToast({
         title: "Unable to send reset",
         message: "Please confirm your email and try again.",
