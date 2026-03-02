@@ -51,7 +51,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" className={`${dmSans.variable} ${spaceGrotesk.variable}`}>
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" data-app-version="firestore-2025-03" className={`${dmSans.variable} ${spaceGrotesk.variable}`}>
       <body>
         <ToastProvider>
           <FirebaseAnalyticsInit />
