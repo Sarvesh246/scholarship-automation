@@ -48,9 +48,10 @@ export default function SignInPage() {
       showToast({ title: "Signed in with Google", variant: "success" });
     } catch (err: unknown) {
       // Firebase Auth errors: { code: "auth/...", message: "..." }; sometimes wrapped
-      const obj = err && typeof err === "object" ? err as Record<string, unknown> : {};
-      const code = (obj.code ?? obj.error?.code ?? "") as string;
-      const msg = (obj.message ?? obj.error?.message ?? "") as string;
+      const obj = err && typeof err === "object" ? (err as Record<string, unknown>) : {};
+      const errObj = obj.error && typeof obj.error === "object" ? (obj.error as Record<string, unknown>) : null;
+      const code = (obj.code ?? errObj?.code ?? "") as string;
+      const msg = (obj.message ?? errObj?.message ?? "") as string;
       const detail = code ? `${code}${msg ? `: ${msg}` : ""}` : msg || (err instanceof Error ? err.message : String(err));
       if (typeof window !== "undefined") {
         console.error("[Google sign-in]", detail, err);
