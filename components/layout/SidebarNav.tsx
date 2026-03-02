@@ -53,7 +53,7 @@ export function SidebarNav() {
         })}
         {isAdmin && (
           <Link
-            href="/app/admin/scholarships"
+            href="/app/admin"
             className={cn(
               "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[var(--muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]",
               pathname?.startsWith("/app/admin") &&

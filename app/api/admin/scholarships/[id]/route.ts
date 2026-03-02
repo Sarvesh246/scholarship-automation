@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/requireAdminAuth";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
+import { enrichWithClassification } from "@/lib/classifyScholarship";
 import type { Scholarship } from "@/types";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
   return [{ id: "_" }];
@@ -33,7 +34,10 @@ export async function PATCH(
     const updates: Partial<Omit<Scholarship, "id">> = {};
     if (body.title !== undefined) updates.title = String(body.title).trim();
     if (body.sponsor !== undefined) updates.sponsor = String(body.sponsor).trim();
-    if (body.amount !== undefined) updates.amount = Number(body.amount);
+    if (body.amount !== undefined) {
+      const n = Number(body.amount);
+      if (Number.isFinite(n)) updates.amount = n;
+    }
     if (body.deadline !== undefined) updates.deadline = String(body.deadline).trim();
     if (body.description !== undefined) updates.description = String(body.description).trim();
     if (body.estimatedTime !== undefined) updates.estimatedTime = String(body.estimatedTime).trim();
@@ -45,7 +49,10 @@ export async function PATCH(
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
 
-    await ref.update(updates);
+    const merged = { id, ...doc.data(), ...updates } as Scholarship;
+    const reclassified = enrichWithClassification(merged);
+    const toUpdate = { ...updates, scholarshipType: reclassified.scholarshipType, nonCitizenEligible: reclassified.nonCitizenEligible };
+    await ref.update(toUpdate);
     const updated = await ref.get();
     return NextResponse.json({ id: updated.id, ...updated.data() });
   } catch (err) {

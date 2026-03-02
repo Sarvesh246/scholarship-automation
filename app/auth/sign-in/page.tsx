@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Divider } from "@/components/ui/Divider";
+import { GoogleLogo } from "@/components/ui/GoogleLogo";
 import { signInWithEmail, signInWithGoogle } from "@/lib/auth";
 import { setAuthCookie } from "@/lib/cookie";
 import { useToast } from "@/components/ui/Toast";
@@ -18,7 +19,11 @@ export default function SignInPage() {
   const searchParams = useSearchParams();
   const { showToast } = useToast();
 
-  const redirectTo = searchParams?.get("from") || "/app/dashboard";
+  const redirectTo = (() => {
+    const from = searchParams?.get("from");
+    if (typeof from === "string" && from.startsWith("/app") && !from.startsWith("//")) return from;
+    return "/app/dashboard";
+  })();
 
   const handleEmailSignIn = async (e: FormEvent) => {
     e.preventDefault();
@@ -95,6 +100,7 @@ export default function SignInPage() {
         className="w-full justify-center"
         onClick={handleGoogleSignIn}
         disabled={loading}
+        leftIcon={<GoogleLogo className="h-5 w-5" />}
       >
         Continue with Google
       </Button>
@@ -140,7 +146,7 @@ export default function SignInPage() {
       <p className="pt-2 text-xs text-[var(--muted)]">
         New here?{" "}
         <Link
-          href="/auth/sign-up"
+          href={redirectTo !== "/app/dashboard" ? `/auth/sign-up?from=${encodeURIComponent(redirectTo)}` : "/auth/sign-up"}
           className="font-medium text-[var(--text)] underline-offset-2 hover:underline"
         >
           Create an account

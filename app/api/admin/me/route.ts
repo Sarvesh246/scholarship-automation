@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminAuth } from "@/lib/firebaseAdmin";
 import { isAdminEmail } from "@/lib/firebaseAdmin";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {

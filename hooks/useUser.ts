@@ -6,11 +6,13 @@ import { onAuthChanged } from "@/lib/auth";
 
 function getInitials(displayName: string | null, email: string | null): string {
   if (displayName?.trim()) {
-    const parts = displayName.trim().split(/\s+/);
+    const parts = displayName.trim().split(/\s+/).filter(Boolean);
     if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+      const first = parts[0][0];
+      const last = parts[parts.length - 1][0];
+      if (first && last) return (first + last).toUpperCase();
     }
-    return parts[0][0].toUpperCase();
+    if (parts[0]?.[0]) return parts[0][0].toUpperCase();
   }
   if (email) return email[0].toUpperCase();
   return "U";

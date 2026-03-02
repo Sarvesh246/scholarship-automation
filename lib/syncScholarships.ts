@@ -1,12 +1,15 @@
 import type { Scholarship } from "@/types";
 import type { ScholarshipCategory } from "@/types";
 import { getAdminFirestore } from "./firebaseAdmin";
+import { isDeadlineValid } from "./scholarshipDeadline";
+import { enrichWithClassification } from "./classifyScholarship";
 import {
   listAllScholarships,
   getScholarship,
   type ScholarshipOwlListItem,
   type ScholarshipOwlDetailResponse,
 } from "./scholarshipOwlApi";
+import { listEducationGrants, fetchOpportunityDetails, type GrantsGovOppHit } from "./grantsGovApi";
 
 /** Shape we can map from common external APIs (ScholarshipAPI.com, Apify, etc.). */
 export interface ExternalScholarshipItem {
@@ -77,11 +80,52 @@ function parsePrompts(raw: string[] | string | undefined): string[] {
   return [];
 }
 
+/** Extract eligibility-like lines from description when eligibility is empty (e.g. scraped content). */
+function extractEligibilityFromDescription(desc: string): string[] {
+  const lines: string[] = [];
+  const text = desc.replace(/\r\n/g, "\n");
+  for (const line of text.split(/\n/)) {
+    const t = line.replace(/^[-•*]\s*/, "").trim();
+    if (t.length < 10) continue;
+    if (/^(Applicant must|Selection based|Eligibility|All majors|College |High school |Master's|Doctoral|No geographic|GPA|Minimum)/i.test(t)) {
+      lines.push(t.slice(0, 200));
+    }
+  }
+  if (lines.length === 0) {
+    const segments = text.split(/\s+[-–—]\s+|\n\s*[-•*]\s*/);
+    for (const s of segments) {
+      const t = s.trim();
+      if (t.length >= 15 && t.length <= 300 && /(applicant|eligibility|major|college|gpa|geographic|citizen)/i.test(t)) {
+        lines.push(t.slice(0, 200));
+      }
+    }
+  }
+  if (lines.length === 0) {
+    const sentences = text.split(/[.!?]\s+/);
+    for (const s of sentences) {
+      const t = s.trim();
+      if (t.length >= 20 && t.length <= 250 && /(applicant must|selection based|eligibility|enrolled|gpa|full-time|citizen)/i.test(t)) {
+        lines.push(t.slice(0, 200));
+      }
+    }
+  }
+  if (lines.length === 0 && text.length > 50) {
+    const first = text.split(/[.!?]/)[0]?.trim();
+    if (first && first.length > 30) lines.push(first.slice(0, 200));
+  }
+  return lines.slice(0, 10);
+}
+
 function parseAmount(v: number | string | undefined): number {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string") {
-    const n = parseInt(v.replace(/[^0-9]/g, ""), 10);
-    return Number.isFinite(n) ? n : 0;
+  if (typeof v === "number" && Number.isFinite(v) && v >= 0) return v;
+  if (typeof v === "string" && v.trim()) {
+    const cleaned = v.replace(/,/g, "").trim();
+    const n = parseInt(cleaned.replace(/[^0-9]/g, ""), 10);
+    if (Number.isFinite(n) && n >= 0) return n;
+    if (/\$[\d,]+/.test(v)) {
+      const m = v.match(/\$[\d,]+/);
+      return m ? parseInt(m[0].replace(/[$,]/g, ""), 10) : 0;
+    }
   }
   return 0;
 }
@@ -105,7 +149,11 @@ export function mapExternalToScholarship(item: ExternalScholarshipItem): Scholar
 
   const eligibilityTags = parseEligibility(item.eligibility);
   const prompts = parsePrompts(item.prompts ?? item.essay_prompts);
-  if (prompts.length === 0) prompts.push("Tell us why you are a strong candidate for this scholarship.");
+  const desc = typeof item.description === "string" ? item.description : "";
+  if (eligibilityTags.length === 0 && desc) {
+    const extracted = extractEligibilityFromDescription(desc);
+    eligibilityTags.push(...extracted);
+  }
 
   return {
     id,
@@ -119,7 +167,7 @@ export function mapExternalToScholarship(item: ExternalScholarshipItem): Scholar
     description: typeof item.description === "string" && item.description.trim()
       ? item.description.trim()
       : `${title} from ${sponsor}.`,
-    prompts
+    prompts: prompts.length > 0 ? prompts : []
   };
 }
 
@@ -151,15 +199,99 @@ export async function syncScholarshipsFromUrl(
     throw new Error("API response must be an array or an object with data/scholarships/results array");
   }
 
+  const toSync = items
+    .filter((item) => isDeadlineValid(item.deadline))
+    .map((item) => enrichWithClassification(mapExternalToScholarship(item)));
+  const db = getAdminFirestore();
+  const col = db.collection("scholarships");
+  let created = 0;
+  let updated = 0;
+  const errors: string[] = [];
+  const BATCH_SIZE = 500;
+
+  for (let offset = 0; offset < toSync.length; offset += BATCH_SIZE) {
+    const chunk = toSync.slice(offset, offset + BATCH_SIZE);
+    const refs = chunk.map((s) => col.doc(s.id));
+    const existing = await Promise.all(refs.map((r) => r.get()));
+    const batch = db.batch();
+    for (let i = 0; i < chunk.length; i++) {
+      try {
+        const { id, ...data } = chunk[i];
+        const ref = refs[i];
+        if (existing[i].exists) {
+          batch.update(ref, data);
+          updated++;
+        } else {
+          batch.set(ref, data);
+          created++;
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        errors.push(`Item "${chunk[i]?.title ?? "?"}": ${msg}`);
+      }
+    }
+    await batch.commit();
+  }
+
+  return { created, updated, errors };
+}
+
+/** Parse MM/DD/YYYY to YYYY-MM-DD. */
+function parseGrantsGovDate(s: string | undefined): string {
+  if (!s || typeof s !== "string") return "2026-12-31";
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return "2026-12-31";
+  const [, mm, dd, yyyy] = m;
+  return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+}
+
+/** Map Grants.gov oppHit to ExternalScholarshipItem. Amount from fetchOpportunityDetails when available. */
+async function mapGrantsGovToExternal(
+  hit: GrantsGovOppHit,
+  details?: { awardCeiling?: number; awardFloor?: number } | null
+): Promise<ExternalScholarshipItem> {
+  const url = `https://www.grants.gov/web/grants/view-opportunity.html?oppId=${hit.id}`;
+  let amount = 0;
+  if (details) {
+    if (details.awardCeiling != null && details.awardCeiling > 0) {
+      amount = details.awardCeiling;
+    } else if (details.awardFloor != null && details.awardFloor > 0) {
+      amount = details.awardFloor;
+    }
+  }
+  return {
+    id: `grants-gov-${hit.id}`,
+    title: hit.title || hit.number || "Federal Grant",
+    sponsor: hit.agencyName || hit.agencyCode || "Federal",
+    amount,
+    deadline: parseGrantsGovDate(hit.closeDate || hit.openDate),
+    description: `${hit.title || "Federal grant"} from ${hit.agencyName || "Federal"}. Apply at Grants.gov: ${url}`,
+  };
+}
+
+/** Sync federal grants from Grants.gov into Firestore. No API key required. */
+export async function syncFromGrantsGov(maxResults = 300): Promise<{
+  created: number;
+  updated: number;
+  errors: string[];
+}> {
+  const hits = await listEducationGrants(maxResults);
   const db = getAdminFirestore();
   const col = db.collection("scholarships");
   let created = 0;
   let updated = 0;
   const errors: string[] = [];
 
-  for (const item of items) {
+  for (let i = 0; i < hits.length; i++) {
+    if (i > 0 && i % 10 === 0) await new Promise((r) => setTimeout(r, 400));
+    const hit = hits[i];
     try {
-      const scholarship = mapExternalToScholarship(item);
+      const details = await fetchOpportunityDetails(hit.id);
+      const item = await mapGrantsGovToExternal(hit, details);
+      if (!isDeadlineValid(item.deadline)) continue;
+      const scholarship = enrichWithClassification(mapExternalToScholarship(item));
+      scholarship.source = "grants_gov";
+      scholarship.scholarshipType = "government";
       const ref = col.doc(scholarship.id);
       const existing = await ref.get();
       const { id, ...data } = scholarship;
@@ -172,7 +304,7 @@ export async function syncScholarshipsFromUrl(
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      errors.push(`Item "${item?.title ?? item?.name ?? '?'}": ${msg}`);
+      errors.push(`Grants.gov ${hit.id}: ${msg}`);
     }
   }
 
@@ -283,13 +415,20 @@ function mapOwlToScholarship(
       }
     }
   }
-  if (prompts.length === 0) prompts.push("Tell us why you are a strong candidate for this scholarship.");
+  const amount = (() => {
+    const amt = att.amount as number | string | undefined;
+    if (typeof amt === "number" && Number.isFinite(amt) && amt > 0) return amt;
+    if (typeof amt === "string" && amt.trim()) return parseAmount(amt);
+    const desc = att.description ?? "";
+    if (desc && parseAmount(desc) > 0) return parseAmount(desc);
+    return 0;
+  })();
 
   return {
     id,
     title,
     sponsor: "ScholarshipOwl",
-    amount: typeof att.amount === "number" && Number.isFinite(att.amount) ? att.amount : 0,
+    amount,
     deadline,
     categoryTags: ["Community"],
     eligibilityTags: [],
@@ -307,6 +446,28 @@ function mapOwlToScholarship(
   };
 }
 
+/** Run async tasks with concurrency limit. */
+async function runWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  let idx = 0;
+  async function worker(): Promise<void> {
+    while (idx < items.length) {
+      const i = idx++;
+      try {
+        results[i] = await fn(items[i]);
+      } catch {
+        results[i] = undefined as R;
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
+  return results;
+}
+
 /** Sync scholarships from ScholarshipOwl API into Firestore. */
 export async function syncFromScholarshipOwl(): Promise<{
   created: number;
@@ -314,21 +475,32 @@ export async function syncFromScholarshipOwl(): Promise<{
   errors: string[];
 }> {
   const items = await listAllScholarships();
+  const validItems = items.filter((item) =>
+    isDeadlineValid(mapOwlToScholarship(item, undefined).deadline)
+  );
+  const details = await runWithConcurrency(
+    validItems,
+    5,
+    async (item) => {
+      try {
+        return await getScholarship(item.id, "fields,requirements");
+      } catch (e) {
+        return undefined;
+      }
+    }
+  );
   const db = getAdminFirestore();
   const col = db.collection("scholarships");
   let created = 0;
   let updated = 0;
   const errors: string[] = [];
 
-  for (const item of items) {
+  for (let i = 0; i < validItems.length; i++) {
+    const item = validItems[i];
+    const detail = details[i];
     try {
-      let detail: ScholarshipOwlDetailResponse | undefined;
-      try {
-        detail = await getScholarship(item.id, "fields,requirements");
-      } catch (e) {
-        if (errors.length < 5) errors.push(`${item.id}: ${e instanceof Error ? e.message : String(e)}`);
-      }
-      const scholarship = mapOwlToScholarship(item, detail);
+      const scholarship = enrichWithClassification(mapOwlToScholarship(item, detail));
+      scholarship.scholarshipType = scholarship.scholarshipType ?? "private";
       const ref = col.doc(scholarship.id);
       const existing = await ref.get();
       const { id: _id, ...data } = scholarship;

@@ -1,4 +1,4 @@
-import { ReactNode, useState, createContext, useContext } from "react";
+import { ReactNode, useState, useRef, useEffect, createContext, useContext } from "react";
 import { cn } from "@/lib/utils";
 
 const DropdownContext = createContext<{ close: () => void } | null>(null);
@@ -7,32 +7,59 @@ interface DropdownMenuProps {
   trigger: ReactNode;
   children: ReactNode;
   align?: "start" | "end";
+  contentClassName?: string;
+  ariaLabel?: string;
 }
 
 export function DropdownMenu({
   trigger,
   children,
-  align = "end"
+  align = "end",
+  contentClassName,
+  ariaLabel
 }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setOpen((v) => !v);
+    }
+  };
 
   return (
-    <div className="relative inline-flex text-sm">
-      <button
-        type="button"
+    <div ref={containerRef} className="relative inline-flex text-sm">
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen((v) => !v)}
-        className="focus:outline-none"
+        onKeyDown={handleKeyDown}
+        className="focus:outline-none cursor-pointer"
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={ariaLabel}
       >
         {trigger}
-      </button>
+      </div>
       {open && (
         <DropdownContext.Provider value={{ close: () => setOpen(false) }}>
           <div
             className={cn(
               "absolute z-30 mt-2 min-w-[160px] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 text-xs shadow-lg",
-              align === "end" ? "right-0" : "left-0"
+              align === "end" ? "right-0" : "left-0",
+              contentClassName
             )}
           >
             {children}

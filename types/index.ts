@@ -22,8 +22,12 @@ export interface Scholarship {
   estimatedTime: string;
   description: string;
   prompts: string[];
-  /** When synced from ScholarshipOwl: external id (same as id), fields and requirements for apply. */
-  source?: "scholarship_owl";
+  /** When synced from external source: scholarship_owl or grants_gov. */
+  source?: "scholarship_owl" | "grants_gov";
+  /** Government vs private/institutional. Set on sync. */
+  scholarshipType?: "government" | "private";
+  /** True if non-citizens (international, DACA, undocumented) may qualify. Set on sync. */
+  nonCitizenEligible?: boolean;
   /** Repeatable scholarship: e.g. "1 month", "1 year". meta.next = next start date. */
   recurring?: string | null;
   /** If set, scholarship is expired and no new applications accepted. */
@@ -61,6 +65,10 @@ export interface Application {
     prompt: string;
     response: string;
   }[];
+  /** When applied via ScholarshipOwl: status returned from their API. */
+  owlStatus?: "received" | "review" | "accepted" | "rejected";
+  /** Last time the user opened this application. Used for "not viewed in a while" notifications. */
+  lastViewedAt?: string;
 }
 
 export interface Essay {

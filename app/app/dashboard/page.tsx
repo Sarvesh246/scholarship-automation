@@ -106,7 +106,8 @@ export default function DashboardPage() {
           deadline: scholarship?.deadline,
           status: app.status,
           progress: app.progress,
-          nextTask: app.nextTask
+          nextTask: app.nextTask,
+          owlStatus: app.owlStatus
         };
       }),
     [applications, scholarships]

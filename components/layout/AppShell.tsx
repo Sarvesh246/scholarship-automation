@@ -17,12 +17,12 @@ export function AppShell({ children, pageTitle }: AppShellProps) {
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
 
   return (
-    <div className="flex min-h-screen bg-[var(--bg)] text-[var(--text)]">
+    <div className="flex h-screen overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       <SidebarNav />
       <MobileSidebar open={mobileNavOpen} onClose={closeMobileNav} />
-      <div className="flex min-h-screen flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <TopBar pageTitle={pageTitle} onMobileMenuToggle={toggleMobileNav} />
-        <main className="flex-1 px-6 pb-8 pt-6 md:px-8">
+        <main className="min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto px-6 pb-8 pt-6 md:px-8">
           <PageTransition>{children}</PageTransition>
         </main>
       </div>

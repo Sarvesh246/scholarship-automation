@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/requireAdminAuth";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
+import { enrichWithClassification } from "@/lib/classifyScholarship";
 import type { Scholarship } from "@/types";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 function slugify(title: string): string {
   return title
@@ -44,7 +45,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const data: Omit<Scholarship, "id"> = {
+    const base: Scholarship = {
+      id,
       title,
       sponsor,
       amount: Number.isFinite(amount) ? amount : 0,
@@ -53,10 +55,11 @@ export async function POST(request: NextRequest) {
       eligibilityTags: eligibilityTags.filter(Boolean),
       estimatedTime: estimatedTime || "2–3 hours",
       description,
-      prompts: prompts.filter(Boolean)
+      prompts: prompts.filter(Boolean),
     };
-
-    await ref.set(data);
+    const scholarship = enrichWithClassification(base);
+    const { id: _id, ...data } = scholarship;
+    await ref.set({ id, ...data });
 
     return NextResponse.json({ id, ...data }, { status: 201 });
   } catch (err) {

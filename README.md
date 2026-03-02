@@ -188,6 +188,21 @@ To trigger from [cron-job.org](https://cron-job.org), [EasyCron](https://www.eas
 
 ---
 
+## Custom web scraper
+
+A Python scraper in `scripts/scrape_scholarships/` can scrape scholarship sites and import into Firestore:
+
+```bash
+cd scripts/scrape_scholarships
+pip install -r requirements.txt
+python main.py -o scraped.json              # Save to file
+python main.py --post http://localhost:3000 --token YOUR_FIREBASE_TOKEN  # Import directly
+```
+
+Includes a scraper for collegescholarships.org (23,000+ scholarships). See `scripts/scrape_scholarships/README.md` for adding new sites.
+
+---
+
 ## Optional: manual Admin only
 
 If you prefer not to use an external API, use **Admin → Scholarships** (and `ADMIN_EMAILS`) to add and edit scholarships by hand. No cron or API keys required.

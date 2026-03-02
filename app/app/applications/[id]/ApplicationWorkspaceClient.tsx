@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getApplication, updateApplicationStatus } from "@/lib/applicationStorage";
+import { getApplication, saveApplication, deleteApplication, updateApplicationStatus, updateApplicationPromptResponses, updateApplicationDocs, updateApplicationLastViewed } from "@/lib/applicationStorage";
 import { getScholarships } from "@/lib/scholarshipStorage";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -28,12 +28,15 @@ export default function ApplicationWorkspaceClient() {
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<StepKey>("overview");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     const [app, schols] = await Promise.all([getApplication(id), getScholarships()]);
     setApplication(app);
     if (app) {
       setScholarship(schols.find((s) => s.id === app.scholarshipId) ?? null);
+      updateApplicationLastViewed(id);
     }
     setLoading(false);
   }, [id]);
@@ -41,6 +44,30 @@ export default function ApplicationWorkspaceClient() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleSave = async () => {
+    if (!application) return;
+    setSaving(true);
+    try {
+      await saveApplication(application);
+      showToast({ title: "Saved", message: "Your progress has been saved.", variant: "success" });
+    } catch {
+      showToast({ title: "Save failed", message: "Please try again.", variant: "danger" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setConfirmDeleteOpen(false);
+    try {
+      await deleteApplication(id);
+      showToast({ title: "Application removed", variant: "success" });
+      router.push("/app/applications");
+    } catch {
+      showToast({ title: "Could not remove application", message: "Please try again.", variant: "danger" });
+    }
+  };
 
   const handleMarkSubmitted = async () => {
     await updateApplicationStatus(id, "submitted", 100);
@@ -78,11 +105,12 @@ export default function ApplicationWorkspaceClient() {
     );
   }
 
+  const prompts = scholarship.prompts ?? [];
   const steps: { key: StepKey; label: string }[] = [
     { key: "overview", label: "Overview" },
     { key: "eligibility", label: "Eligibility" },
     { key: "documents", label: "Documents" },
-    { key: "prompts", label: "Prompts" },
+    ...(prompts.length > 0 ? [{ key: "prompts" as StepKey, label: "Prompts" }] : []),
     { key: "final", label: "Final review" }
   ];
 
@@ -92,9 +120,17 @@ export default function ApplicationWorkspaceClient() {
         title={scholarship.title}
         subtitle="Application workspace"
         primaryAction={
-          <Button type="button" variant="secondary" onClick={() => router.back()}>
-            Back
-          </Button>
+          <div className="flex gap-2">
+            <Button type="button" variant="secondary" onClick={() => router.back()}>
+              Back
+            </Button>
+            <Button type="button" variant="secondary" size="sm" onClick={handleSave} disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </Button>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setConfirmDeleteOpen(true)} className="text-red-400 hover:text-red-300 hover:border-red-500/30">
+              Delete
+            </Button>
+          </div>
         }
       />
 
@@ -132,9 +168,9 @@ export default function ApplicationWorkspaceClient() {
             <div className="space-y-3">
               <h3 className="text-sm font-semibold font-heading">Overview</h3>
               {scholarship.description && (
-                <p className="text-xs text-[var(--text)] leading-relaxed">
+                <div className="text-xs text-[var(--text)] leading-relaxed whitespace-pre-line">
                   {scholarship.description}
-                </p>
+                </div>
               )}
               <p className="text-xs text-[var(--muted)]">
                 Use this workspace to move from idea to submitted application
@@ -145,36 +181,60 @@ export default function ApplicationWorkspaceClient() {
           {step === "eligibility" && (
             <div className="space-y-3">
               <h3 className="text-sm font-semibold font-heading">Eligibility</h3>
-              <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-[var(--muted)]">
-                {scholarship.eligibilityTags.map((tag) => (
-                  <li key={tag}>{tag}</li>
-                ))}
-              </ul>
+              {(scholarship.eligibilityTags ?? []).length > 0 ? (
+                <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-[var(--muted)]">
+                  {(scholarship.eligibilityTags ?? []).map((tag) => (
+                    <li key={tag}>{tag}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  No specific eligibility requirements listed for this scholarship.
+                </p>
+              )}
             </div>
           )}
           {step === "documents" && (
             <div className="space-y-3">
               <h3 className="text-sm font-semibold font-heading">Documents</h3>
               <div className="space-y-2">
-                {application.docsRequired.map((doc) => (
+                {(application.docsRequired ?? []).map((doc) => (
                   <DocumentSlot
                     key={doc}
                     label={doc}
-                    uploaded={application.docsUploaded.includes(doc)}
+                    uploaded={(application.docsUploaded ?? []).includes(doc)}
+                    onUpload={async () => {
+                      const next = [...(application.docsUploaded ?? [])];
+                      if (!next.includes(doc)) next.push(doc);
+                      await updateApplicationDocs(id, next);
+                      const updated = await getApplication(id);
+                      if (updated) setApplication(updated);
+                    }}
                   />
                 ))}
               </div>
             </div>
           )}
-          {step === "prompts" && (
+          {step === "prompts" && prompts.length > 0 && (
             <div className="space-y-3">
               <h3 className="text-sm font-semibold font-heading">Prompts</h3>
-              {scholarship.prompts.map((prompt, index) => (
+              {prompts.map((prompt, index) => (
                 <PromptBlock
                   key={index}
                   prompt={prompt}
-                  value={application.promptResponses[index]?.response ?? ""}
-                  onChange={() => {}}
+                  value={(application.promptResponses ?? [])[index]?.response ?? ""}
+                  onChange={async (value) => {
+                    const next = [...(application.promptResponses ?? [])];
+                    while (next.length <= index) next.push({ prompt: prompts[next.length] ?? "", response: "" });
+                    next[index] = { prompt, response: value };
+                    await updateApplicationPromptResponses(id, next, {
+                      docsRequired: (application.docsRequired ?? []).length,
+                      docsUploaded: (application.docsUploaded ?? []).length,
+                      promptsTotal: prompts.length,
+                    });
+                    const updated = await getApplication(id);
+                    if (updated) setApplication(updated);
+                  }}
                 />
               ))}
             </div>
@@ -187,14 +247,21 @@ export default function ApplicationWorkspaceClient() {
                   {
                     id: "docs",
                     label: "All required documents attached",
-                    completed: application.docsUploaded.length >=
-                      application.docsRequired.length
+                    completed: (application.docsUploaded ?? []).length >=
+                      (application.docsRequired ?? []).length
                   },
-                  {
-                    id: "prompts",
-                    label: "Essay prompts have at least one draft",
-                    completed: application.promptResponses.length > 0
-                  }
+                  ...(prompts.length > 0
+                    ? [{
+                        id: "prompts",
+                        label: "Essay prompts completed",
+                        completed: (application.promptResponses ?? []).length >= prompts.length &&
+                          (application.promptResponses ?? []).every((r) => (r.response ?? "").trim().length > 0)
+                      }]
+                    : [{
+                        id: "prompts",
+                        label: "No essays required",
+                        completed: true
+                      }])
                 ]}
               />
               <div className="rounded-xl bg-[var(--bg-secondary)] px-3 py-2 text-xs text-[var(--muted)]">
@@ -253,6 +320,15 @@ export default function ApplicationWorkspaceClient() {
         primaryLabel="Mark submitted"
         onClose={() => setConfirmOpen(false)}
         onPrimary={handleMarkSubmitted}
+      />
+      <Modal
+        open={confirmDeleteOpen}
+        title="Remove this application?"
+        description="This will remove the application from your pipeline. Your drafts and progress will be lost."
+        primaryLabel="Remove"
+        destructive
+        onClose={() => setConfirmDeleteOpen(false)}
+        onPrimary={handleDelete}
       />
     </div>
   );

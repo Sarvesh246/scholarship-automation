@@ -72,6 +72,8 @@ export default function DeadlinesPage() {
     return date > twoWeeks;
   });
 
+  const hasAnyDeadlines = deadlines.length > 0;
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -87,14 +89,30 @@ export default function DeadlinesPage() {
         title="Deadlines"
         subtitle="See what's due this week and beyond."
       />
-      <DeadlineList
-        groups={[
-          { label: "This week", items: thisWeek },
-          { label: "Next week", items: nextWeek },
-          { label: "Later", items: later }
-        ]}
-        onResume={(scholarshipId) => router.push(`/app/applications/${scholarshipId}`)}
-      />
+      {!hasAnyDeadlines ? (
+        <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-8 text-center">
+          <p className="text-sm font-medium text-[var(--text)]">No deadlines yet</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Start an application from the Scholarships page to see due dates here.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push("/app/scholarships")}
+            className="btn-gold mt-4 inline-flex text-sm py-2 px-5"
+          >
+            Browse scholarships
+          </button>
+        </div>
+      ) : (
+        <DeadlineList
+          groups={[
+            { label: "This week", items: thisWeek },
+            { label: "Next week", items: nextWeek },
+            { label: "Later", items: later }
+          ]}
+          onResume={(scholarshipId) => router.push(`/app/applications/${scholarshipId}`)}
+        />
+      )}
     </div>
   );
 }

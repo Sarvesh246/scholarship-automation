@@ -7,7 +7,8 @@ import {
   getDoc,
   getDocFromServer,
   setDoc,
-  updateDoc
+  updateDoc,
+  deleteDoc
 } from "firebase/firestore";
 
 const isDev = process.env.NODE_ENV === "development";
@@ -101,6 +102,49 @@ export async function ensureApplication(
   }
 }
 
+export async function updateApplicationPromptResponses(
+  id: string,
+  promptResponses: { prompt: string; response: string }[],
+  progressContext?: { docsRequired: number; docsUploaded: number; promptsTotal: number }
+): Promise<void> {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return;
+  try {
+    const ref = doc(db, "users", uid, "applications", id);
+    const updates: Record<string, unknown> = { promptResponses };
+    if (progressContext) {
+      const docsDone = progressContext.docsUploaded >= progressContext.docsRequired;
+      const promptsDone = promptResponses.length >= progressContext.promptsTotal &&
+        promptResponses.every((r) => (r.response ?? "").trim().length > 0);
+      const progress = progressContext.promptsTotal === 0
+        ? (docsDone ? 100 : 50)
+        : Math.round(
+            (docsDone ? 50 : 0) + (promptsDone ? 50 : (promptResponses.filter((r) => (r.response ?? "").trim().length > 0).length / progressContext.promptsTotal) * 50)
+          );
+      updates.progress = Math.min(100, progress);
+      updates.status = progress >= 100 ? "reviewing" : "drafting";
+      updates.nextTask = progress >= 100 ? "Ready to submit" : "Complete prompts and documents";
+    }
+    await updateDoc(ref, updates);
+  } catch (err) {
+    if (isDev) console.error("[applicationStorage] updateApplicationPromptResponses failed:", err);
+  }
+}
+
+export async function updateApplicationDocs(
+  id: string,
+  docsUploaded: string[]
+): Promise<void> {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return;
+  try {
+    const ref = doc(db, "users", uid, "applications", id);
+    await updateDoc(ref, { docsUploaded });
+  } catch (err) {
+    if (isDev) console.error("[applicationStorage] updateApplicationDocs failed:", err);
+  }
+}
+
 export async function updateApplicationStatus(
   id: string,
   status: Application["status"],
@@ -115,5 +159,46 @@ export async function updateApplicationStatus(
     await updateDoc(ref, updates);
   } catch (err) {
     if (isDev) console.error("[applicationStorage] updateApplicationStatus failed:", err);
+  }
+}
+
+export async function updateApplicationLastViewed(id: string): Promise<void> {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return;
+  try {
+    const ref = doc(db, "users", uid, "applications", id);
+    await updateDoc(ref, { lastViewedAt: new Date().toISOString() });
+  } catch (err) {
+    if (isDev) console.error("[applicationStorage] updateApplicationLastViewed failed:", err);
+  }
+}
+
+export async function deleteApplication(id: string): Promise<void> {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return;
+  try {
+    await deleteDoc(doc(db, "users", uid, "applications", id));
+  } catch (err) {
+    if (isDev) console.error("[applicationStorage] deleteApplication failed:", err);
+    throw err;
+  }
+}
+
+export async function updateApplicationOwlStatus(
+  id: string,
+  owlStatus: "received" | "review" | "accepted" | "rejected"
+): Promise<void> {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return;
+  try {
+    const ref = doc(db, "users", uid, "applications", id);
+    await updateDoc(ref, {
+      status: "submitted",
+      progress: 100,
+      nextTask: "Submitted",
+      owlStatus
+    });
+  } catch (err) {
+    if (isDev) console.error("[applicationStorage] updateApplicationOwlStatus failed:", err);
   }
 }

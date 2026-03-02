@@ -209,7 +209,7 @@ export default function AdminScholarshipsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <PageHeader
         title="Admin: Scholarships"
         subtitle="Add, edit, or remove scholarships. Changes appear for all users."
@@ -230,7 +230,7 @@ export default function AdminScholarshipsPage() {
             </p>
           ) : (
             scholarships.map((s) => (
-              <Card key={s.id} className="flex items-center justify-between gap-4 p-4">
+              <Card key={s.id} className="flex min-w-0 flex-wrap items-center justify-between gap-4 p-4">
                 <div className="min-w-0 flex-1">
                   <p className="font-medium truncate">{s.title}</p>
                   <p className="text-xs text-[var(--muted-2)]">{s.sponsor} · ${s.amount.toLocaleString()} · {s.deadline}</p>

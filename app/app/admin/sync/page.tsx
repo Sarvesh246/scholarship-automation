@@ -1,0 +1,118 @@
+"use client";
+
+import { useState } from "react";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { useToast } from "@/components/ui/Toast";
+import { useAdmin, getIdToken } from "@/hooks/useAdmin";
+
+export default function AdminSyncPage() {
+  const { isAdmin, loading: adminLoading } = useAdmin();
+  const { showToast } = useToast();
+  const [syncing, setSyncing] = useState(false);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+
+  const runSync = async () => {
+    const token = await getIdToken();
+    if (!token) {
+      showToast({ title: "Not signed in", variant: "danger" });
+      return;
+    }
+    setSyncing(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/sync", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      setResult(data);
+      if (res.ok) {
+        const parts: string[] = [];
+        if (data.owl?.created != null || data.owl?.updated != null) {
+          parts.push(`Owl: ${data.owl.created ?? 0} created, ${data.owl.updated ?? 0} updated`);
+        }
+        if (data.grantsGov?.created != null || data.grantsGov?.updated != null) {
+          parts.push(`Grants.gov: ${data.grantsGov.created ?? 0} created, ${data.grantsGov.updated ?? 0} updated`);
+        }
+        if (data.url?.created != null || data.url?.updated != null) {
+          parts.push(`URL: ${data.url.created ?? 0} created, ${data.url.updated ?? 0} updated`);
+        }
+        showToast({
+          title: "Sync completed",
+          message: parts.length ? parts.join(". ") : "Check result below.",
+          variant: "success",
+        });
+      } else {
+        showToast({ title: "Sync failed", message: data.error ?? "See result below.", variant: "danger" });
+      }
+    } catch (e) {
+      showToast({
+        title: "Sync failed",
+        message: e instanceof Error ? e.message : "Something went wrong.",
+        variant: "danger",
+      });
+      setResult({ error: e instanceof Error ? e.message : "Request failed" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  if (adminLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Sync scholarships" subtitle="Run sync from the website" />
+        <div className="h-32 animate-pulse rounded-2xl bg-[var(--surface-2)]" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Sync scholarships" />
+        <p className="text-sm text-[var(--muted)]">You don&apos;t have permission to access this page.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Sync scholarships"
+        subtitle="Pull latest scholarships from ScholarshipOwl or your custom API into Firestore."
+        primaryAction={
+          <Button
+            type="button"
+            onClick={runSync}
+            disabled={syncing}
+          >
+            {syncing ? "Syncing…" : "Run sync now"}
+          </Button>
+        }
+      />
+
+      <Card className="p-4 text-sm">
+        <h3 className="font-medium text-[var(--text)]">What runs</h3>
+        <ul className="mt-2 list-inside list-disc space-y-1 text-[var(--muted)]">
+          <li><strong>ScholarshipOwl</strong> – if SCHOLARSHIP_OWL_API_KEY is set: lists scholarships, fetches fields/requirements, writes to Firestore.</li>
+          <li><strong>Custom URL</strong> – if SCHOLARSHIP_API_URL is set: fetches JSON array (or data/scholarships/results), maps and writes to Firestore.</li>
+          <li><strong>Grants.gov</strong> – always runs: fetches federal education grants (no API key), writes to Firestore.</li>
+        </ul>
+        <p className="mt-3 text-xs text-[var(--muted-2)]">
+          Same logic as the cron job; no CRON_SECRET needed when run from Admin.
+        </p>
+      </Card>
+
+      {result != null && (
+        <Card className="p-4">
+          <h3 className="mb-2 text-sm font-medium text-[var(--text)]">Last result</h3>
+          <pre className="max-h-64 overflow-auto rounded-lg bg-[var(--bg)] p-3 text-xs text-[var(--muted)]">
+            {JSON.stringify(result, null, 2)}
+          </pre>
+        </Card>
+      )}
+    </div>
+  );
+}

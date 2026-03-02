@@ -1,4 +1,6 @@
-import { ReactNode } from "react";
+"use client";
+
+import { ReactNode, useEffect } from "react";
 import { Button } from "./Button";
 
 interface ModalProps {
@@ -31,6 +33,15 @@ export function Modal({
   destructive,
   children
 }: ModalProps) {
+  useEffect(() => {
+    if (!open) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const handlePrimary = async () => {
@@ -39,8 +50,18 @@ export function Modal({
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4 py-6">
-      <div className="flex max-h-[90vh] w-full max-w-md flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-lg">
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4 py-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <div
+        className="absolute inset-0"
+        aria-hidden="true"
+        onClick={onClose}
+      />
+      <div className="relative flex max-h-[90vh] w-full max-w-md flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-lg">
         <div className="shrink-0 px-6 pt-6">
           <h2 className="text-sm font-semibold font-heading">{title}</h2>
           {description && (

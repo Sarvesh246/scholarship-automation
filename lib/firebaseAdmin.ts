@@ -54,7 +54,7 @@ export function getAdminFirestore() {
 
 const ADMIN_EMAILS_KEY = "ADMIN_EMAILS";
 
-/** Comma-separated list of emails that can access admin APIs. */
+/** Comma-separated list of emails that can access admin APIs and see the Admin section. Set your email here to keep admin access. */
 export function getAdminEmails(): string[] {
   const raw = process.env[ADMIN_EMAILS_KEY] ?? "";
   return raw

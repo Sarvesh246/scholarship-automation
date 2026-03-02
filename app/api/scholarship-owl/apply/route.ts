@@ -37,7 +37,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await applyToScholarship(scholarshipId, attributes);
-    return NextResponse.json({ ok: true, data: result.data });
+    const data = result.data;
+    const statusId = data?.relationships?.status?.data?.id ?? "received";
+    return NextResponse.json({
+      ok: true,
+      data,
+      applicationId: data?.id ?? data?.attributes?.id,
+      status: statusId,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Apply failed";
     console.error("[scholarship-owl/apply]", err);

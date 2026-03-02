@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { syncScholarshipsFromUrl, syncFromScholarshipOwl } from "@/lib/syncScholarships";
+import { syncScholarshipsFromUrl, syncFromScholarshipOwl, syncFromGrantsGov } from "@/lib/syncScholarships";
+import { deleteExpiredScholarships } from "@/lib/scholarshipDeadline";
 
 export const dynamic = "force-dynamic";
 
@@ -19,17 +20,6 @@ function isAuthorized(request: NextRequest): boolean {
 export async function GET(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!SCHOLARSHIP_OWL_API_KEY && !SCHOLARSHIP_API_URL) {
-    return NextResponse.json(
-      {
-        error: "No scholarship source configured",
-        message:
-          "Set SCHOLARSHIP_OWL_API_KEY for ScholarshipOwl API and/or SCHOLARSHIP_API_URL for a custom JSON API."
-      },
-      { status: 503 }
-    );
   }
 
   const results: Record<string, unknown> = {};
@@ -54,6 +44,22 @@ export async function GET(request: NextRequest) {
       console.error("[cron/sync-scholarships] URL", err);
       results.urlError = message;
     }
+  }
+
+  try {
+    const grantsResult = await syncFromGrantsGov(300);
+    results.grantsGov = { created: grantsResult.created, updated: grantsResult.updated, errors: grantsResult.errors };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Grants.gov sync failed";
+    console.error("[cron/sync-scholarships] Grants.gov", err);
+    results.grantsGovError = message;
+  }
+
+  try {
+    const expiredDeleted = await deleteExpiredScholarships();
+    results.expiredDeleted = expiredDeleted;
+  } catch (err) {
+    console.error("[cron/sync-scholarships] Cleanup expired failed", err);
   }
 
   return NextResponse.json({ ok: true, ...results });

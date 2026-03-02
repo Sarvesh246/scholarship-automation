@@ -2,10 +2,11 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Divider } from "@/components/ui/Divider";
+import { GoogleLogo } from "@/components/ui/GoogleLogo";
 import { signInWithGoogle, signUpWithEmail, updateUserDisplayName } from "@/lib/auth";
 import { setAuthCookie } from "@/lib/cookie";
 import { useToast } from "@/components/ui/Toast";
@@ -17,7 +18,14 @@ export default function SignUpPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showToast } = useToast();
+
+  const redirectTo = (() => {
+    const from = searchParams?.get("from");
+    if (typeof from === "string" && from.startsWith("/app") && !from.startsWith("//")) return from;
+    return "/app/dashboard";
+  })();
 
   const handleEmailSignUp = async (e: FormEvent) => {
     e.preventDefault();
@@ -44,7 +52,7 @@ export default function SignUpPage() {
         await updateUserDisplayName(name.trim());
       }
       setAuthCookie();
-      router.push("/app/dashboard");
+      router.push(redirectTo);
       showToast({
         title: "Account created",
         message: "Welcome to your scholarship workspace.",
@@ -66,7 +74,7 @@ export default function SignUpPage() {
     try {
       await signInWithGoogle();
       setAuthCookie();
-      router.push("/app/dashboard");
+      router.push(redirectTo);
       showToast({
         title: "Signed up with Google",
         variant: "success"
@@ -97,6 +105,7 @@ export default function SignUpPage() {
         className="w-full justify-center"
         onClick={handleGoogleSignUp}
         disabled={loading}
+        leftIcon={<GoogleLogo className="h-5 w-5" />}
       >
         Sign up with Google
       </Button>
@@ -159,7 +168,7 @@ export default function SignUpPage() {
       <p className="pt-2 text-xs text-[var(--muted)]">
         Already have an account?{" "}
         <Link
-          href="/auth/sign-in"
+          href={redirectTo !== "/app/dashboard" ? `/auth/sign-in?from=${encodeURIComponent(redirectTo)}` : "/auth/sign-in"}
           className="font-medium text-[var(--text)] underline-offset-2 hover:underline"
         >
           Sign in

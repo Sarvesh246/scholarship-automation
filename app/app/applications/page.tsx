@@ -77,20 +77,37 @@ export default function ApplicationsPage() {
       />
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-[var(--muted)]">
-          {applications.length} total applications.
-        </p>
-        <Tabs
-          value={view}
-          onChange={(v) => setView(v as "board" | "list")}
-          tabs={[
-            { value: "board", label: "Board" },
-            { value: "list", label: "List" }
-          ]}
-        />
+        {applications.length > 0 && (
+          <>
+            <p className="text-xs text-[var(--muted)]">
+              {applications.length} total applications.
+            </p>
+            <Tabs
+              value={view}
+              onChange={(v) => setView(v as "board" | "list")}
+              tabs={[
+                { value: "board", label: "Board" },
+                { value: "list", label: "List" }
+              ]}
+            />
+          </>
+        )}
       </div>
 
-      {view === "board" ? (
+      {applications.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-8 text-center">
+          <p className="text-sm font-medium text-[var(--text)]">No applications yet</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Start an application from the Scholarships page to see it here.
+          </p>
+          <Link
+            href="/app/scholarships"
+            className="btn-gold mt-4 inline-flex text-sm py-2 px-5"
+          >
+            Browse scholarships
+          </Link>
+        </div>
+      ) : view === "board" ? (
         <PipelineBoard
           applications={cards}
           getCardHref={(id) => `/app/applications/${id}`}

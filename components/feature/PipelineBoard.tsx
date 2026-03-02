@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ApplicationStatus } from "@/types";
 import { cn } from "@/lib/utils";
 import { ProgressBar } from "@/components/ui/ProgressBar";
+import { Badge } from "@/components/ui/Badge";
 
 export interface PipelineCardData {
   id: string;
@@ -12,6 +13,8 @@ export interface PipelineCardData {
   status: ApplicationStatus;
   progress: number;
   nextTask: string;
+  /** When applied via ScholarshipOwl: received | review | accepted | rejected */
+  owlStatus?: "received" | "review" | "accepted" | "rejected";
 }
 
 function formatAmount(amount?: number) {
@@ -27,6 +30,13 @@ function formatDeadline(deadline?: string) {
   });
 }
 
+const OWL_STATUS_LABEL: Record<string, string> = {
+  received: "Received",
+  review: "Under review",
+  accepted: "Accepted",
+  rejected: "Rejected"
+};
+
 const ApplicationCard = memo(function ApplicationCard({
   card,
   href
@@ -37,6 +47,20 @@ const ApplicationCard = memo(function ApplicationCard({
   const content = (
     <>
       <p className="text-sm font-semibold leading-snug">{card.title}</p>
+      {card.status === "submitted" && card.owlStatus && (
+        <Badge
+          variant={
+            card.owlStatus === "accepted"
+              ? "success"
+              : card.owlStatus === "rejected"
+                ? "danger"
+                : "info"
+          }
+          className="mt-1"
+        >
+          {OWL_STATUS_LABEL[card.owlStatus] ?? card.owlStatus}
+        </Badge>
+      )}
       <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-[var(--muted-2)]">
         {card.amount && (
           <span className="text-amber-400 font-medium">{formatAmount(card.amount)}</span>
