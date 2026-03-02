@@ -6,7 +6,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { PipelineBoard } from "@/components/feature/PipelineBoard";
-import { DeadlineList } from "@/components/feature/DeadlineList";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { getApplications } from "@/lib/applicationStorage";
 import { getScholarships } from "@/lib/scholarshipStorage";
@@ -113,32 +112,6 @@ export default function DashboardPage() {
     [applications, scholarships]
   );
 
-  const today = new Date();
-  const todayGroup = {
-    label: "Today",
-    items: applicationDeadlines.filter((d) => {
-      const date = new Date(d.deadline);
-      return (
-        date.getFullYear() === today.getFullYear() &&
-        date.getMonth() === today.getMonth() &&
-        date.getDate() === today.getDate()
-      );
-    })
-  };
-  const thisWeekGroup = {
-    label: "This week",
-    items: deadlinesThisWeek.filter(
-      (d) => !todayGroup.items.some((t) => t.id === d.id)
-    )
-  };
-  const nextTwoWeeksGroup = {
-    label: "Next 2 weeks",
-    items: getDeadlinesForNextDays(applicationDeadlines, 14).filter(
-      (d) =>
-        !todayGroup.items.concat(thisWeekGroup.items).some((t) => t.id === d.id)
-    )
-  };
-
   const statCards = [
     {
       label: "Matched scholarships",
@@ -231,17 +204,12 @@ export default function DashboardPage() {
         <h2 className="text-sm font-medium text-[var(--muted)]">
           Applications pipeline
         </h2>
-        <PipelineBoard applications={pipelineCards} />
-      </div>
-
-      <div className="space-y-3">
-        <h2 className="text-sm font-medium text-[var(--muted)]">
-          Upcoming deadlines
-        </h2>
-        <DeadlineList
-          groups={[todayGroup, thisWeekGroup, nextTwoWeeksGroup]}
+        <PipelineBoard
+          applications={pipelineCards}
+          getCardHref={(applicationId) => `/app/applications/${applicationId}`}
         />
       </div>
+
     </div>
   );
 }

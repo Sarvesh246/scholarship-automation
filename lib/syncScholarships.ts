@@ -1,6 +1,12 @@
 import type { Scholarship } from "@/types";
 import type { ScholarshipCategory } from "@/types";
 import { getAdminFirestore } from "./firebaseAdmin";
+import {
+  listAllScholarships,
+  getScholarship,
+  type ScholarshipOwlListItem,
+  type ScholarshipOwlDetailResponse,
+} from "./scholarshipOwlApi";
 
 /** Shape we can map from common external APIs (ScholarshipAPI.com, Apify, etc.). */
 export interface ExternalScholarshipItem {
@@ -167,6 +173,175 @@ export async function syncScholarshipsFromUrl(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       errors.push(`Item "${item?.title ?? item?.name ?? '?'}": ${msg}`);
+    }
+  }
+
+  return { created, updated, errors };
+}
+
+/** Map ScholarshipOwl list item + detail (with included fields/requirements) to our Scholarship */
+function mapOwlToScholarship(
+  item: ScholarshipOwlListItem,
+  detail?: ScholarshipOwlDetailResponse
+): Scholarship {
+  const att = item.attributes;
+  const title = att.title || "Untitled Scholarship";
+  const id = item.id;
+  const deadline = att.deadline
+    ? att.deadline.replace(/T.*$/, "")
+    : "2026-12-31";
+
+  const recurring =
+    att.recurringValue && att.recurringType
+      ? `${att.recurringValue} ${att.recurringType}`
+      : null;
+  const expiredAt = att.expiredAt ?? null;
+  const nextStart = item.meta?.next ?? null;
+
+  const prompts: string[] = [];
+  type OwlReq = {
+    id: string;
+    title?: string;
+    description?: string;
+    optional: boolean;
+    requirementType: "text" | "input" | "link" | "file" | "image";
+    config?: Record<string, unknown>;
+  };
+  const owlRequirements: OwlReq[] = [];
+  type OwlField = {
+    id: string;
+    name: string;
+    type: string;
+    options?: Record<string, unknown>;
+    eligibilityType?: string | null;
+    eligibilityValue?: string | null;
+    optional?: boolean;
+  };
+  const owlFields: OwlField[] = [];
+
+  if (detail?.included) {
+    const inc = detail.included as Array<{
+      type: string;
+      id: string;
+      attributes?: {
+        name?: string;
+        type?: string;
+        title?: string;
+        description?: string;
+        optional?: boolean;
+        options?: Record<string, unknown>;
+        eligibilityType?: string | null;
+        eligibilityValue?: string | null;
+        config?: Record<string, unknown>;
+      };
+      relationships?: { requirement?: { data?: { id: string } }; field?: { data?: { id: string } } };
+    }>;
+    const fieldsById = new Map<string, { name: string; type: string; options?: Record<string, unknown> }>();
+    const requirementsById = new Map<string, string>();
+    for (const i of inc) {
+      if (i.type === "field" && i.attributes) {
+        fieldsById.set(i.id, {
+          name: i.attributes.name ?? i.id,
+          type: i.attributes.type ?? "text",
+          options: i.attributes.options,
+        });
+      }
+      if (i.type === "requirement" && i.attributes) {
+        requirementsById.set(i.id, i.attributes.type ?? "text");
+      }
+    }
+    for (const i of inc) {
+      if (i.type === "scholarship_field") {
+        const fieldId = (i.relationships?.field as { data?: { id: string } })?.data?.id;
+        const def = fieldId ? fieldsById.get(fieldId) : null;
+        owlFields.push({
+          id: fieldId ?? i.id,
+          name: def?.name ?? i.id,
+          type: def?.type ?? "text",
+          options: def?.options,
+          eligibilityType: i.attributes?.eligibilityType ?? null,
+          eligibilityValue: i.attributes?.eligibilityValue ?? null,
+          optional: i.attributes?.optional ?? false,
+        });
+      }
+      if (i.type === "scholarship_requirement") {
+        const reqTypeId = (i.relationships?.requirement as { data?: { id: string } })?.data?.id;
+        const raw = requirementsById.get(reqTypeId ?? "") ?? "text";
+        const requirementType = (raw === "essay" ? "text" : raw) as OwlReq["requirementType"];
+        owlRequirements.push({
+          id: i.id,
+          title: i.attributes?.title,
+          description: i.attributes?.description,
+          optional: i.attributes?.optional ?? false,
+          requirementType,
+          config: i.attributes?.config,
+        });
+        if (raw === "essay" || raw === "text" || raw === "input" || raw === "link") {
+          const t = i.attributes?.title ?? i.attributes?.description ?? i.id;
+          if (t && !prompts.includes(t)) prompts.push(t);
+        }
+      }
+    }
+  }
+  if (prompts.length === 0) prompts.push("Tell us why you are a strong candidate for this scholarship.");
+
+  return {
+    id,
+    title,
+    sponsor: "ScholarshipOwl",
+    amount: typeof att.amount === "number" && Number.isFinite(att.amount) ? att.amount : 0,
+    deadline,
+    categoryTags: ["Community"],
+    eligibilityTags: [],
+    estimatedTime: "2–3 hours",
+    description: typeof att.description === "string" && att.description.trim()
+      ? att.description.trim()
+      : `${title} from ScholarshipOwl.`,
+    prompts,
+    source: "scholarship_owl",
+    recurring,
+    expiredAt,
+    nextStart,
+    owlFields: owlFields.length > 0 ? owlFields : undefined,
+    owlRequirements: owlRequirements.length > 0 ? owlRequirements : undefined,
+  };
+}
+
+/** Sync scholarships from ScholarshipOwl API into Firestore. */
+export async function syncFromScholarshipOwl(): Promise<{
+  created: number;
+  updated: number;
+  errors: string[];
+}> {
+  const items = await listAllScholarships();
+  const db = getAdminFirestore();
+  const col = db.collection("scholarships");
+  let created = 0;
+  let updated = 0;
+  const errors: string[] = [];
+
+  for (const item of items) {
+    try {
+      let detail: ScholarshipOwlDetailResponse | undefined;
+      try {
+        detail = await getScholarship(item.id, "fields,requirements");
+      } catch (e) {
+        if (errors.length < 5) errors.push(`${item.id}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      const scholarship = mapOwlToScholarship(item, detail);
+      const ref = col.doc(scholarship.id);
+      const existing = await ref.get();
+      const { id: _id, ...data } = scholarship;
+      if (existing.exists) {
+        await ref.update(data);
+        updated++;
+      } else {
+        await ref.set(data);
+        created++;
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      errors.push(`Owl ${item.id}: ${msg}`);
     }
   }
 

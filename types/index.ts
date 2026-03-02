@@ -22,6 +22,31 @@ export interface Scholarship {
   estimatedTime: string;
   description: string;
   prompts: string[];
+  /** When synced from ScholarshipOwl: external id (same as id), fields and requirements for apply. */
+  source?: "scholarship_owl";
+  /** Repeatable scholarship: e.g. "1 month", "1 year". meta.next = next start date. */
+  recurring?: string | null;
+  /** If set, scholarship is expired and no new applications accepted. */
+  expiredAt?: string | null;
+  /** Next run start date when recurring. */
+  nextStart?: string | null;
+  owlFields?: {
+    id: string;
+    name: string;
+    type: string;
+    options?: Record<string, unknown>;
+    eligibilityType?: string | null;
+    eligibilityValue?: string | null;
+    optional?: boolean;
+  }[];
+  owlRequirements?: {
+    id: string;
+    title?: string;
+    description?: string;
+    optional: boolean;
+    requirementType: "text" | "input" | "link" | "file" | "image";
+    config?: Record<string, unknown>;
+  }[];
 }
 
 export interface Application {
