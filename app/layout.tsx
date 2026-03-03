@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { FirebaseAnalyticsInit } from "@/components/FirebaseAnalyticsInit";
 import { ThemeInit } from "@/components/ThemeInit";
 import { ScrapeJobPoller } from "@/components/ScrapeJobPoller";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -74,6 +75,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <FirebaseAnalyticsInit />
           {children}
         </ToastProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
