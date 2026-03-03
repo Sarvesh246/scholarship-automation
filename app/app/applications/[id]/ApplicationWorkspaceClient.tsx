@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getApplication, saveApplication, deleteApplication, updateApplicationStatus, updateApplicationPromptResponses, updateApplicationDocs, updateApplicationLastViewed } from "@/lib/applicationStorage";
-import { getScholarships } from "@/lib/scholarshipStorage";
+import { getScholarship } from "@/lib/scholarshipStorage";
+import { getEssays } from "@/lib/essayStorage";
+import { matchEssaysToPrompt } from "@/lib/essayMatching";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -14,7 +16,8 @@ import { PromptBlock } from "@/components/feature/PromptBlock";
 import { Modal } from "@/components/ui/Modal";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
-import type { Application, Scholarship } from "@/types";
+import type { Application, Scholarship, Essay } from "@/types";
+import { decodeHtmlEntities } from "@/lib/utils";
 
 type StepKey = "overview" | "eligibility" | "documents" | "prompts" | "final";
 
@@ -30,12 +33,18 @@ export default function ApplicationWorkspaceClient() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [essays, setEssays] = useState<Essay[]>([]);
 
   const loadData = useCallback(async () => {
-    const [app, schols] = await Promise.all([getApplication(id), getScholarships()]);
+    const [app, userEssays] = await Promise.all([
+      getApplication(id),
+      getEssays(),
+    ]);
     setApplication(app);
+    setEssays(userEssays);
     if (app) {
-      setScholarship(schols.find((s) => s.id === app.scholarshipId) ?? null);
+      const schol = await getScholarship(app.scholarshipId);
+      setScholarship(schol);
       updateApplicationLastViewed(id);
     }
     setLoading(false);
@@ -117,17 +126,17 @@ export default function ApplicationWorkspaceClient() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={scholarship.title}
+        title={decodeHtmlEntities(scholarship.title)}
         subtitle="Application workspace"
         primaryAction={
           <div className="flex gap-2">
             <Button type="button" variant="secondary" onClick={() => router.back()}>
               Back
             </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={handleSave} disabled={saving}>
+            <Button type="button" variant="secondary" onClick={handleSave} disabled={saving}>
               {saving ? "Saving…" : "Save"}
             </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setConfirmDeleteOpen(true)} className="text-red-400 hover:text-red-300 hover:border-red-500/30">
+            <Button type="button" variant="secondary" onClick={() => setConfirmDeleteOpen(true)} className="text-red-400 hover:text-red-300 hover:border-red-500/30">
               Delete
             </Button>
           </div>
@@ -169,7 +178,7 @@ export default function ApplicationWorkspaceClient() {
               <h3 className="text-sm font-semibold font-heading">Overview</h3>
               {scholarship.description && (
                 <div className="text-xs text-[var(--text)] leading-relaxed whitespace-pre-line">
-                  {scholarship.description}
+                  {decodeHtmlEntities(scholarship.description)}
                 </div>
               )}
               <p className="text-xs text-[var(--muted)]">
@@ -184,7 +193,7 @@ export default function ApplicationWorkspaceClient() {
               {(scholarship.eligibilityTags ?? []).length > 0 ? (
                 <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-[var(--muted)]">
                   {(scholarship.eligibilityTags ?? []).map((tag) => (
-                    <li key={tag}>{tag}</li>
+                    <li key={tag}>{decodeHtmlEntities(tag)}</li>
                   ))}
                 </ul>
               ) : (
@@ -223,6 +232,7 @@ export default function ApplicationWorkspaceClient() {
                   key={index}
                   prompt={prompt}
                   value={(application.promptResponses ?? [])[index]?.response ?? ""}
+                  suggestedEssays={matchEssaysToPrompt(essays, prompt, scholarship)}
                   onChange={async (value) => {
                     const next = [...(application.promptResponses ?? [])];
                     while (next.length <= index) next.push({ prompt: prompts[next.length] ?? "", response: "" });

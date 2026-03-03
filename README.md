@@ -106,7 +106,22 @@ For **Admin** and **cron sync** (optional): `FIREBASE_SERVICE_ACCOUNT_KEY`, `ADM
 
 In Firebase Console → **Authentication → Settings → Authorized domains**, add your Vercel domain (e.g. `your-app.vercel.app`).
 
-### 4. Deploy
+### 4. Allow Sign in with Google from any network (no IP restriction)
+
+If only certain IPs can sign in with Google, the restriction is in **Google Cloud Console**, not in this app.
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/) and select your Firebase project.
+2. Go to **APIs & Services → Credentials**.
+3. Find the **API key** used by your web app (the same value as `NEXT_PUBLIC_FIREBASE_API_KEY`).
+4. Click the key → **Application restrictions**.
+5. If it is set to **“IP addresses”** (or “HTTP referrers” that don’t include your site), either:
+   - Set to **“None”** so the key works from any IP (typical for a public web app), or  
+   - Add the origins/URLs you need (e.g. `https://your-app.vercel.app/*`, `http://localhost:3000/*`) under **“HTTP referrers”** so any visitor can sign in from any network.
+6. Save. Sign in with Google should then work from any WiFi or network.
+
+See also **docs/firebase-google-signin-any-ip.md** for step-by-step details.
+
+### 5. Deploy
 
 Push to `main` (or your configured branch). Vercel deploys automatically. The cron job runs hourly via `vercel.json`.
 

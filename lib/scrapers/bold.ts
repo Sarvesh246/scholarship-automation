@@ -8,6 +8,10 @@ import { SCRAPER_HEADERS, parseDeadline, delay } from "./shared";
 
 const BASE_URL = "https://www.bold.org";
 
+/** Category page titles/slugs that are not real scholarships. */
+const JUNK_TITLES = /^(By\s+)?(Demographics|Major|Year|State)$/i;
+const JUNK_SLUGS = new Set(["by-state", "by-major", "by-year", "by-demographics"]);
+
 export async function scrapeBold(maxPages = 3): Promise<ScrapedScholarship[]> {
   const results: ScrapedScholarship[] = [];
   const seen = new Set<string>();
@@ -27,8 +31,7 @@ export async function scrapeBold(maxPages = 3): Promise<ScrapedScholarship[]> {
       if (isCategoryPage(href)) return;
       const match = href.match(/\/scholarships\/([^/]+)\/?$/);
       const slug = match?.[1] ?? "";
-      const categorySlugs = ["by-state", "by-major", "by-year", "by-demographics"];
-      if (!slug || seen.has(slug) || categorySlugs.includes(slug) || /^\d+$/.test(slug)) return;
+      if (!slug || seen.has(slug) || JUNK_SLUGS.has(slug) || /^\d+$/.test(slug)) return;
 
       const card = $(el).closest("article, [class*='card'], [class*='scholarship']");
       const block = card.length ? card : $(el).parent();
@@ -38,18 +41,19 @@ export async function scrapeBold(maxPages = 3): Promise<ScrapedScholarship[]> {
       seen.add(slug);
 
       const titleEl = block.find("h2, h3, h4, [class*='title']").first();
-      const title = titleEl.text().trim() || slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      const rawTitle = titleEl.text().trim() || slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      if (JUNK_TITLES.test(rawTitle.trim())) return;
 
       const amount = parseAmountFromText(text);
       const dlMatch = text.match(/Deadline[:\s]+([A-Za-z]+\s+\d{1,2},?\s*\d{4}|[A-Za-z]+\s+\d{1,2}|[A-Za-z]+)/i);
       const deadline = dlMatch ? parseDeadline(dlMatch[1]) : "2026-12-31";
 
       const fullUrl = href.startsWith("http") ? href : `${BASE_URL}${href.startsWith("/") ? "" : "/"}${href}`;
-      const desc = text.slice(0, 400).trim() || `${title}. Apply at ${fullUrl}`;
+      const desc = text.slice(0, 400).trim() || `${rawTitle}. Apply at ${fullUrl}`;
 
       results.push({
         id: `bold-${slug}`,
-        title,
+        title: rawTitle,
         sponsor: "Bold.org",
         amount,
         deadline,

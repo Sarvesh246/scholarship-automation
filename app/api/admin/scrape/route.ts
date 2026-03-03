@@ -4,7 +4,8 @@ import { getAdminFirestore } from "@/lib/firebaseAdmin";
 import { mapExternalToScholarship, type ExternalScholarshipItem } from "@/lib/syncScholarships";
 import { enrichWithClassification } from "@/lib/classifyScholarship";
 import { runAllScrapers, SCRAPERS, type ScraperId } from "@/lib/scrapers";
-import { isDeadlineValid, deleteExpiredScholarships } from "@/lib/scholarshipDeadline";
+import { isDeadlineValid, deleteExpiredScholarships, deleteJunkScholarships } from "@/lib/scholarshipDeadline";
+import { logSync, logError } from "@/lib/adminLog";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
       const valid = itemsList.filter((item) => isDeadlineValid(typeof item.deadline === "string" ? item.deadline : undefined));
       const toWrite = valid.map((item) => {
         const scholarship = enrichWithClassification(mapExternalToScholarship(item));
+        scholarship.source = id as "bold" | "collegescholarships" | "scholarshipscom" | "scholarships360" | "collegedata";
         const docId = item.id && typeof item.id === "string" ? item.id : scholarship.id;
         return { scholarship, docId };
       });
@@ -70,13 +72,18 @@ export async function POST(request: NextRequest) {
         await batch.commit();
       }
       results[id] = { created, updated, total: itemsList.length, skipped: itemsList.length - valid.length };
+      logSync(`scrape:${id}`, created, updated).catch(() => {});
     }
 
-    const deleted = await deleteExpiredScholarships();
+    const [expiredDeleted, junkDeleted] = await Promise.all([
+      deleteExpiredScholarships(),
+      deleteJunkScholarships(),
+    ]);
 
-    return NextResponse.json({ ok: true, results, expiredDeleted: deleted });
+    return NextResponse.json({ ok: true, results, expiredDeleted, junkDeleted });
   } catch (err) {
     console.error("[POST /api/admin/scrape]", err);
+    logError("scrape", err instanceof Error ? err.message : "Scrape failed").catch(() => {});
     return NextResponse.json({ error: "Scrape failed" }, { status: 500 });
   }
 }

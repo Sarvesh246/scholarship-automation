@@ -7,7 +7,13 @@ import { cn } from "@/lib/utils";
 
 const adminNavItems: { href: string; label: string }[] = [
   { href: "/app/admin", label: "Admin home" },
+  { href: "/app/admin/dashboard", label: "Dashboard" },
   { href: "/app/admin/scholarships", label: "Scholarships" },
+  { href: "/app/admin/bulk", label: "Bulk" },
+  { href: "/app/admin/cleanup", label: "Cleanup" },
+  { href: "/app/admin/data-quality", label: "Data quality" },
+  { href: "/app/admin/users", label: "Users" },
+  { href: "/app/admin/feedback", label: "Feedback" },
   { href: "/app/admin/sync", label: "Sync" },
   { href: "/app/admin/scrape", label: "Scrape" },
 ];

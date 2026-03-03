@@ -15,6 +15,7 @@ export default function SignInPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googlePopupBlocked, setGooglePopupBlocked] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showToast } = useToast();
@@ -33,18 +34,25 @@ export default function SignInPage() {
       setAuthCookie();
       router.push(redirectTo);
       showToast({ title: "Welcome back", variant: "success" });
-    } catch {
-      showToast({
-        title: "Sign-in failed",
-        message: "Check your credentials and try again.",
-        variant: "danger"
-      });
+    } catch (err: unknown) {
+      const obj = err && typeof err === "object" ? (err as Record<string, unknown>) : {};
+      const code = (obj.code ?? (obj as { code?: string }).code) as string;
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+        showToast({ title: "Incorrect email or password.", variant: "danger" });
+      } else {
+        showToast({
+          title: "Sign-in failed",
+          message: "Check your credentials and try again.",
+          variant: "danger"
+        });
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
+    setGooglePopupBlocked(false);
     setLoading(true);
     try {
       await signInWithGoogle();
@@ -68,12 +76,14 @@ export default function SignInPage() {
           variant: "danger"
         });
       } else if (code === "auth/popup-blocked") {
+        setGooglePopupBlocked(true);
         showToast({
           title: "Popup blocked",
-          message: "Allow popups for this site and try again.",
+          message: "Allow popups for this site, then click Try again below.",
           variant: "danger"
         });
       } else {
+        setGooglePopupBlocked(false);
         showToast({
           title: "Google sign-in failed",
           message: detail || "Please try again.",
@@ -98,12 +108,20 @@ export default function SignInPage() {
         type="button"
         variant="secondary"
         className="w-full justify-center"
-        onClick={handleGoogleSignIn}
+        onClick={() => { setGooglePopupBlocked(false); handleGoogleSignIn(); }}
         disabled={loading}
         leftIcon={<GoogleLogo className="h-5 w-5" />}
       >
         Continue with Google
       </Button>
+      {googlePopupBlocked && (
+        <p className="text-xs text-amber-400">
+          Popup was blocked. Allow popups for this site, then{" "}
+          <button type="button" onClick={() => handleGoogleSignIn()} className="underline font-medium hover:no-underline">
+            try again
+          </button>.
+        </p>
+      )}
 
       <Divider label="or continue with email" />
 

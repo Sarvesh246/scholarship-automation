@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DeadlineList } from "@/components/feature/DeadlineList";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { getApplications } from "@/lib/applicationStorage";
 import { getScholarships } from "@/lib/scholarshipStorage";
@@ -90,19 +91,12 @@ export default function DeadlinesPage() {
         subtitle="See what's due this week and beyond."
       />
       {!hasAnyDeadlines ? (
-        <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-8 text-center">
-          <p className="text-sm font-medium text-[var(--text)]">No deadlines yet</p>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            Start an application from the Scholarships page to see due dates here.
-          </p>
-          <button
-            type="button"
-            onClick={() => router.push("/app/scholarships")}
-            className="btn-gold mt-4 inline-flex text-sm py-2 px-5"
-          >
-            Browse scholarships
-          </button>
-        </div>
+        <EmptyState
+          title="No deadlines yet"
+          description="Start an application from the Scholarships page to see due dates here."
+          actionLabel="Browse scholarships"
+          onAction={() => router.push("/app/scholarships")}
+        />
       ) : (
         <DeadlineList
           groups={[
@@ -110,7 +104,7 @@ export default function DeadlinesPage() {
             { label: "Next week", items: nextWeek },
             { label: "Later", items: later }
           ]}
-          onResume={(scholarshipId) => router.push(`/app/applications/${scholarshipId}`)}
+          onResume={(applicationId) => router.push(`/app/applications/${applicationId}`)}
         />
       )}
     </div>

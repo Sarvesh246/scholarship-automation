@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/requireAdminAuth";
-import { deleteExpiredScholarships } from "@/lib/scholarshipDeadline";
+import { deleteExpiredScholarships, deleteJunkScholarships } from "@/lib/scholarshipDeadline";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +13,11 @@ export async function POST(request: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   try {
-    const deleted = await deleteExpiredScholarships();
-    return NextResponse.json({ ok: true, deleted });
+    const [expiredDeleted, junkDeleted] = await Promise.all([
+      deleteExpiredScholarships(),
+      deleteJunkScholarships(),
+    ]);
+    return NextResponse.json({ ok: true, expiredDeleted, junkDeleted, deleted: expiredDeleted + junkDeleted });
   } catch (err) {
     console.error("[admin/cleanup-expired]", err);
     return NextResponse.json({ error: "Cleanup failed" }, { status: 500 });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncScholarshipsFromUrl, syncFromScholarshipOwl, syncFromGrantsGov } from "@/lib/syncScholarships";
-import { deleteExpiredScholarships } from "@/lib/scholarshipDeadline";
+import { deleteExpiredScholarships, deleteJunkScholarships } from "@/lib/scholarshipDeadline";
 
 export const dynamic = "force-dynamic";
 
@@ -56,10 +56,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const expiredDeleted = await deleteExpiredScholarships();
+    const [expiredDeleted, junkDeleted] = await Promise.all([
+      deleteExpiredScholarships(),
+      deleteJunkScholarships(),
+    ]);
     results.expiredDeleted = expiredDeleted;
+    results.junkDeleted = junkDeleted;
   } catch (err) {
-    console.error("[cron/sync-scholarships] Cleanup expired failed", err);
+    console.error("[cron/sync-scholarships] Cleanup failed", err);
   }
 
   return NextResponse.json({ ok: true, ...results });

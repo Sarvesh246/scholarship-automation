@@ -1,8 +1,9 @@
 import { memo, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Scholarship } from "@/types";
+import { Scholarship, ScholarshipMatchResult } from "@/types";
 import { Tag } from "@/components/ui/Tag";
+import { formatCategoryDisplay, decodeHtmlEntities } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 
@@ -10,12 +11,14 @@ interface Props {
   scholarship: Scholarship;
   hasApplication?: boolean;
   onStartApplication?: (scholarship: Scholarship) => Promise<void>;
+  matchResult?: ScholarshipMatchResult;
 }
 
 export const ScholarshipRowCard = memo(function ScholarshipRowCard({
   scholarship,
   hasApplication = false,
-  onStartApplication
+  onStartApplication,
+  matchResult,
 }: Props) {
   const [starting, setStarting] = useState(false);
   const router = useRouter();
@@ -54,8 +57,25 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
             href={`/app/scholarships/${scholarship.id}`}
             className="font-semibold hover:text-amber-400 transition-colors"
           >
-            {scholarship.title}
+            {decodeHtmlEntities(scholarship.title)}
           </Link>
+          {scholarship.verificationStatus === "approved" && (
+            <span title="Screened by our quality checks">
+              <Badge variant="success">Verified</Badge>
+            </span>
+          )}
+          {matchResult && matchResult.eligibilityStatus === "eligible" && (
+            <>
+              <Badge variant="success">Eligible</Badge>
+              <span className="text-emerald-400 font-medium">{matchResult.matchScore}% match</span>
+            </>
+          )}
+          {scholarship.featured && (
+            <Badge variant="success">Featured</Badge>
+          )}
+          {scholarship.displayCategory === "sweepstakes" && (
+            <Badge variant="info">Sweepstakes</Badge>
+          )}
           {isExpired && (
             <Badge variant="danger">Expired</Badge>
           )}
@@ -66,20 +86,28 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
           )}
         </div>
         <p className="text-xs text-[var(--muted-2)]">
-          {scholarship.sponsor}
+          {decodeHtmlEntities(scholarship.sponsor)}
         </p>
+        {matchResult && matchResult.reasons.length > 0 && (
+          <p className="text-[11px] text-emerald-400/90">
+            Matches: {matchResult.reasons.slice(0, 4).join(", ")}
+          </p>
+        )}
         <div className="mt-1 flex flex-wrap gap-3 text-xs text-[var(--muted)]">
           <span className="flex items-center gap-1">
             <span className="text-amber-400 font-medium">
-              ${(scholarship.amount ?? 0).toLocaleString()}
+              {(scholarship.amount ?? 0) > 0 ? `$${(scholarship.amount ?? 0).toLocaleString()}` : "Varies"}
             </span>
           </span>
           <span>Deadline: {deadline}</span>
           <span>Effort: {scholarship.estimatedTime ?? "—"}</span>
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
+          {(scholarship.normalized?.requirements ?? []).slice(0, 4).map((req) => (
+            <Tag key={req}>{req}</Tag>
+          ))}
           {(scholarship.categoryTags ?? []).map((tag) => (
-            <Tag key={tag}>{tag}</Tag>
+            <Tag key={tag}>{formatCategoryDisplay(tag)}</Tag>
           ))}
         </div>
       </div>

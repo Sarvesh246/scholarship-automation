@@ -3,6 +3,10 @@ import type { ScholarshipCategory } from "@/types";
 import { getAdminFirestore } from "./firebaseAdmin";
 import { isDeadlineValid } from "./scholarshipDeadline";
 import { enrichWithClassification } from "./classifyScholarship";
+import { isInstitutionalGrant, isOverMaxPrize } from "./institutionalGrantFilter";
+import { runQualityVerification } from "./scholarshipQuality";
+import { normalizeScholarship } from "./normalizeScholarship";
+import { estimateEffortTime } from "./estimateEffort";
 import {
   listAllScholarships,
   getScholarship,
@@ -27,6 +31,8 @@ export interface ExternalScholarshipItem {
   category?: string;
   prompts?: string[];
   essay_prompts?: string[];
+  docsRequired?: string[];
+  docs_required?: string[];
   [key: string]: unknown;
 }
 
@@ -155,6 +161,18 @@ export function mapExternalToScholarship(item: ExternalScholarshipItem): Scholar
     eligibilityTags.push(...extracted);
   }
 
+  const docsCount = Array.isArray(item.docsRequired)
+    ? item.docsRequired.length
+    : Array.isArray(item.docs_required)
+      ? item.docs_required.length
+      : undefined;
+
+  const estimatedTime = estimateEffortTime({
+    prompts,
+    docsCount,
+    description: desc || undefined,
+  });
+
   return {
     id,
     title,
@@ -163,7 +181,7 @@ export function mapExternalToScholarship(item: ExternalScholarshipItem): Scholar
     deadline: typeof item.deadline === "string" && item.deadline ? item.deadline : "2026-12-31",
     categoryTags,
     eligibilityTags,
-    estimatedTime: "2–3 hours",
+    estimatedTime,
     description: typeof item.description === "string" && item.description.trim()
       ? item.description.trim()
       : `${title} from ${sponsor}.`,
@@ -201,7 +219,22 @@ export async function syncScholarshipsFromUrl(
 
   const toSync = items
     .filter((item) => isDeadlineValid(item.deadline))
-    .map((item) => enrichWithClassification(mapExternalToScholarship(item)));
+    .map((item) => enrichWithClassification(mapExternalToScholarship(item)))
+    .filter((s) => !isOverMaxPrize(s))
+    .map((s) => {
+      const q = runQualityVerification(s);
+      const withQuality = { ...s, ...q };
+      const normalized = normalizeScholarship(withQuality);
+      return {
+        ...s,
+        qualityScore: q.qualityScore,
+        verificationStatus: q.verificationStatus,
+        domainTrustScore: q.domainTrustScore,
+        displayCategory: q.displayCategory,
+        lastVerifiedAt: q.lastVerifiedAt,
+        normalized,
+      };
+    });
   const db = getAdminFirestore();
   const col = db.collection("scholarships");
   let created = 0;
@@ -292,9 +325,30 @@ export async function syncFromGrantsGov(maxResults = 300): Promise<{
       const scholarship = enrichWithClassification(mapExternalToScholarship(item));
       scholarship.source = "grants_gov";
       scholarship.scholarshipType = "government";
-      const ref = col.doc(scholarship.id);
+      if (isInstitutionalGrant(scholarship)) continue;
+      if (isOverMaxPrize(scholarship)) continue;
+      const q = runQualityVerification(scholarship);
+      const withQuality = {
+        ...scholarship,
+        qualityScore: q.qualityScore,
+        verificationStatus: q.verificationStatus,
+        domainTrustScore: q.domainTrustScore,
+        displayCategory: q.displayCategory,
+        lastVerifiedAt: q.lastVerifiedAt,
+      };
+      const normalized = normalizeScholarship(withQuality);
+      const toWrite = {
+        ...scholarship,
+        qualityScore: q.qualityScore,
+        verificationStatus: q.verificationStatus,
+        domainTrustScore: q.domainTrustScore,
+        displayCategory: q.displayCategory,
+        lastVerifiedAt: q.lastVerifiedAt,
+        normalized,
+      };
+      const ref = col.doc(toWrite.id);
       const existing = await ref.get();
-      const { id, ...data } = scholarship;
+      const { id, ...data } = toWrite;
       if (existing.exists) {
         await ref.update(data);
         updated++;
@@ -424,6 +478,15 @@ function mapOwlToScholarship(
     return 0;
   })();
 
+  const docsCount = owlRequirements.filter(
+    (r) => r.requirementType === "file" || r.requirementType === "image"
+  ).length;
+  const estimatedTime = estimateEffortTime({
+    prompts,
+    docsCount,
+    description: typeof att.description === "string" ? att.description : undefined,
+  });
+
   return {
     id,
     title,
@@ -432,7 +495,7 @@ function mapOwlToScholarship(
     deadline,
     categoryTags: ["Community"],
     eligibilityTags: [],
-    estimatedTime: "2–3 hours",
+    estimatedTime,
     description: typeof att.description === "string" && att.description.trim()
       ? att.description.trim()
       : `${title} from ScholarshipOwl.`,
@@ -501,9 +564,29 @@ export async function syncFromScholarshipOwl(): Promise<{
     try {
       const scholarship = enrichWithClassification(mapOwlToScholarship(item, detail));
       scholarship.scholarshipType = scholarship.scholarshipType ?? "private";
-      const ref = col.doc(scholarship.id);
+      if (isOverMaxPrize(scholarship)) continue;
+      const q = runQualityVerification(scholarship);
+      const withQuality = {
+        ...scholarship,
+        qualityScore: q.qualityScore,
+        verificationStatus: q.verificationStatus,
+        domainTrustScore: q.domainTrustScore,
+        displayCategory: q.displayCategory,
+        lastVerifiedAt: q.lastVerifiedAt,
+      };
+      const normalized = normalizeScholarship(withQuality);
+      const toWrite = {
+        ...scholarship,
+        qualityScore: q.qualityScore,
+        verificationStatus: q.verificationStatus,
+        domainTrustScore: q.domainTrustScore,
+        displayCategory: q.displayCategory,
+        lastVerifiedAt: q.lastVerifiedAt,
+        normalized,
+      };
+      const ref = col.doc(toWrite.id);
       const existing = await ref.get();
-      const { id: _id, ...data } = scholarship;
+      const { id: _id, ...data } = toWrite;
       if (existing.exists) {
         await ref.update(data);
         updated++;

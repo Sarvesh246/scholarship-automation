@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { decodeHtmlEntities } from "@/lib/utils";
 
 interface DeadlineItem {
   id: string;
@@ -18,7 +19,7 @@ interface DeadlineGroup {
 
 interface DeadlineListProps {
   groups: DeadlineGroup[];
-  onResume?: (scholarshipId: string) => void;
+  onResume?: (applicationId: string) => void;
 }
 
 export function DeadlineList({ groups, onResume }: DeadlineListProps) {
@@ -53,7 +54,7 @@ export function DeadlineList({ groups, onResume }: DeadlineListProps) {
                       {date}
                     </span>
                     <div>
-                      <p className="font-medium leading-snug">{item.title}</p>
+                      <p className="font-medium leading-snug">{decodeHtmlEntities(item.title)}</p>
                       <div className="mt-1 flex items-center gap-2 text-[10px] text-[var(--muted-2)]">
                         <Badge
                           variant={
@@ -77,7 +78,7 @@ export function DeadlineList({ groups, onResume }: DeadlineListProps) {
                     type="button"
                     size="sm"
                     variant="secondary"
-                    onClick={() => onResume?.(item.scholarshipId)}
+                    onClick={() => onResume?.(item.id)}
                   >
                     Resume
                   </Button>

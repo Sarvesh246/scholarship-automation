@@ -11,20 +11,8 @@ import { useToast } from "@/components/ui/Toast";
 import { getProfile, saveProfile } from "@/lib/profileStorage";
 import { updateUserDisplayName } from "@/lib/auth";
 import { useUser } from "@/hooks/useUser";
+import { getProfileCompletion, getMissingItemsForMatchUnlock } from "@/lib/profileCompletion";
 import type { Profile } from "@/types";
-
-function computeCompletion(p: Profile): number {
-  let filled = 0;
-  if (p.academics?.gpa?.trim()) filled++;
-  if (p.academics?.major?.trim()) filled++;
-  if (p.academics?.graduationYear?.trim()) filled++;
-  if ((p.activities?.length ?? 0) > 0) filled++;
-  if ((p.awards?.length ?? 0) > 0) filled++;
-  const finKeys = p.financial && typeof p.financial === "object" ? Object.values(p.financial) : [];
-  if (finKeys.some((v) => typeof v === "string" && v.trim())) filled++;
-  const total = 6;
-  return Math.round((filled / total) * 100);
-}
 
 export default function ProfilePage() {
   const { showToast } = useToast();
@@ -34,6 +22,17 @@ export default function ProfilePage() {
   const [activities, setActivities] = useState<{ id: string; name: string; role: string }[]>([]);
   const [awards, setAwards] = useState<{ id: string; name: string; year: string }[]>([]);
   const [financial, setFinancial] = useState<Record<string, string>>({ context: "" });
+  const [location, setLocation] = useState({ country: "", state: "", city: "" });
+  const [educationLevel, setEducationLevel] = useState<"high_school" | "college" | "grad" | "">("");
+  const [schoolName, setSchoolName] = useState("");
+  const [gpaScale, setGpaScale] = useState<"4.0" | "5.0">("4.0");
+  const [intendedMajors, setIntendedMajors] = useState<string[]>([]);
+  const [majorsFreeText, setMajorsFreeText] = useState("");
+  const [timeBudgetPreference, setTimeBudgetPreference] = useState<"low" | "medium" | "high">("medium");
+  const [essayPreference, setEssayPreference] = useState(true);
+  const [needBasedInterest, setNeedBasedInterest] = useState(false);
+  const [optionalEligibility, setOptionalEligibility] = useState<Profile["optionalEligibility"]>({});
+  const [showOptionalSection, setShowOptionalSection] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -54,18 +53,42 @@ export default function ProfilePage() {
       setActivities(Array.isArray(p.activities) ? p.activities : []);
       setAwards(Array.isArray(p.awards) ? p.awards : []);
       setFinancial(p.financial && Object.keys(p.financial).length > 0 ? p.financial : { context: "" });
+      setLocation({
+        country: p.location?.country ?? p.demographics?.country ?? "",
+        state: p.location?.state ?? p.demographics?.state ?? "",
+        city: p.location?.city ?? p.demographics?.city ?? "",
+      });
+      setEducationLevel((p.educationLevel as "" | "high_school" | "college" | "grad") ?? "");
+      setSchoolName(p.schoolName ?? "");
+      setGpaScale(p.academics?.gpaScale === "5.0" ? "5.0" : "4.0");
+      setIntendedMajors(Array.isArray(p.intendedMajors) ? p.intendedMajors : []);
+      setMajorsFreeText(p.majorsFreeText ?? "");
+      setTimeBudgetPreference(p.timeBudgetPreference ?? "medium");
+      setEssayPreference(p.essayPreference ?? true);
+      setNeedBasedInterest(p.needBasedInterest ?? false);
+      setOptionalEligibility(p.optionalEligibility ?? {});
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, []);
 
   const profile: Profile = {
-    academics: { ...academics },
+    academics: { ...academics, gpaScale },
     activities: [...activities],
     awards: [...awards],
-    financial: { ...financial }
+    financial: { ...financial },
+    location: location.country || location.state || location.city ? location : undefined,
+    educationLevel: educationLevel || undefined,
+    schoolName: schoolName.trim() || undefined,
+    intendedMajors: intendedMajors.length ? intendedMajors : undefined,
+    majorsFreeText: majorsFreeText.trim() || undefined,
+    timeBudgetPreference,
+    essayPreference,
+    needBasedInterest,
+    optionalEligibility: Object.keys(optionalEligibility ?? {}).length ? optionalEligibility : undefined,
   };
-  const completion = Math.min(100, computeCompletion(profile));
+  const { percent: completion } = getProfileCompletion(profile);
+  const { count: missingCount, suggestions } = getMissingItemsForMatchUnlock(profile);
 
   const handleSaveAll = async () => {
     if (academics.gpa && (isNaN(Number(academics.gpa)) || Number(academics.gpa) < 0 || Number(academics.gpa) > 5)) {
@@ -146,6 +169,11 @@ export default function ProfilePage() {
           <p className="text-amber-400">{completion}%</p>
         </div>
         <ProgressBar value={completion} />
+        {missingCount > 0 && (
+          <p className="text-[11px] text-[var(--muted-2)]">
+            Add {missingCount} more to unlock more matches: {suggestions.join(", ")}
+          </p>
+        )}
       </Card>
 
       <Card className="space-y-3 p-4">
@@ -176,6 +204,21 @@ export default function ProfilePage() {
             value={academics.gpa}
             onChange={(e) => setAcademics((prev) => ({ ...prev, gpa: e.target.value }))}
           />
+          <div>
+            <p className="mb-1 text-xs font-medium text-[var(--muted)]">GPA scale</p>
+            <div className="flex gap-2">
+              {(["4.0", "5.0"] as const).map((scale) => (
+                <button
+                  key={scale}
+                  type="button"
+                  onClick={() => setGpaScale(scale)}
+                  className={`rounded-lg px-3 py-1.5 text-sm ${gpaScale === scale ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "border border-[var(--border)] text-[var(--muted)]"}`}
+                >
+                  {scale}
+                </button>
+              ))}
+            </div>
+          </div>
           <Input
             label="Major / area of study"
             placeholder="e.g. Computer Science"
@@ -188,9 +231,174 @@ export default function ProfilePage() {
             value={academics.graduationYear}
             onChange={(e) => setAcademics((prev) => ({ ...prev, graduationYear: e.target.value }))}
           />
+          <div>
+            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Education level</p>
+            <select
+              value={educationLevel}
+              onChange={(e) => setEducationLevel(e.target.value as typeof educationLevel)}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm"
+            >
+              <option value="">Select</option>
+              <option value="high_school">High school</option>
+              <option value="college">College</option>
+              <option value="grad">Grad</option>
+            </select>
+          </div>
+          <Input
+            label="School name (optional)"
+            placeholder="e.g. Lincoln High"
+            value={schoolName}
+            onChange={(e) => setSchoolName(e.target.value)}
+          />
           <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
             Save academics
           </Button>
+        </Card>
+
+        <Card className="space-y-3 p-4">
+          <h3 className="text-sm font-semibold font-heading">Location</h3>
+          <Input
+            label="Country"
+            placeholder="e.g. USA"
+            value={location.country}
+            onChange={(e) => setLocation((prev) => ({ ...prev, country: e.target.value }))}
+          />
+          <Input
+            label="State"
+            placeholder="e.g. CA"
+            value={location.state}
+            onChange={(e) => setLocation((prev) => ({ ...prev, state: e.target.value }))}
+          />
+          <Input
+            label="City (optional)"
+            placeholder="e.g. San Francisco"
+            value={location.city}
+            onChange={(e) => setLocation((prev) => ({ ...prev, city: e.target.value }))}
+          />
+          <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
+            Save location
+          </Button>
+        </Card>
+
+        <Card className="space-y-3 p-4">
+          <h3 className="text-sm font-semibold font-heading">Preferences</h3>
+          <div>
+            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Time budget per week</p>
+            <div className="flex flex-wrap gap-2">
+              {(["low", "medium", "high"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTimeBudgetPreference(t)}
+                  className={`rounded-lg px-3 py-1.5 text-sm ${timeBudgetPreference === t ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "border border-[var(--border)] text-[var(--muted)]"}`}
+                >
+                  {t === "low" ? "Low" : t === "medium" ? "Medium" : "High"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer text-sm">
+            <input
+              type="checkbox"
+              checked={essayPreference}
+              onChange={(e) => setEssayPreference(e.target.checked)}
+              className="rounded border-[var(--border)] text-amber-500"
+            />
+            Okay with essays
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer text-sm">
+            <input
+              type="checkbox"
+              checked={needBasedInterest}
+              onChange={(e) => setNeedBasedInterest(e.target.checked)}
+              className="rounded border-[var(--border)] text-amber-500"
+            />
+            Interested in need-based scholarships
+          </label>
+          <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
+            Save preferences
+          </Button>
+        </Card>
+
+        <Card className="space-y-3 p-4">
+          <h3 className="text-sm font-semibold font-heading">Intended major(s)</h3>
+          <Input
+            label="Free text (e.g. CS, Biology)"
+            placeholder="Comma-separated"
+            value={majorsFreeText}
+            onChange={(e) => setMajorsFreeText(e.target.value)}
+          />
+          <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
+            Save majors
+          </Button>
+        </Card>
+
+        <Card className="space-y-3 p-4">
+          <button
+            type="button"
+            onClick={() => setShowOptionalSection((v) => !v)}
+            className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--text)]"
+          >
+            {showOptionalSection ? "−" : "+"} Optional eligibility (only used to filter scholarships)
+          </button>
+          {showOptionalSection && (
+            <div className="space-y-2 pt-2 text-sm">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={optionalEligibility?.firstGen ?? false}
+                  onChange={(e) => setOptionalEligibility((p) => ({ ...p, firstGen: e.target.checked }))}
+                  className="rounded border-[var(--border)] text-amber-500"
+                />
+                First-gen
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={optionalEligibility?.militaryFamily ?? false}
+                  onChange={(e) => setOptionalEligibility((p) => ({ ...p, militaryFamily: e.target.checked }))}
+                  className="rounded border-[var(--border)] text-amber-500"
+                />
+                Military family
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={optionalEligibility?.disability ?? false}
+                  onChange={(e) => setOptionalEligibility((p) => ({ ...p, disability: e.target.checked }))}
+                  className="rounded border-[var(--border)] text-amber-500"
+                />
+                Disability (general)
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={optionalEligibility?.fosterCare ?? false}
+                  onChange={(e) => setOptionalEligibility((p) => ({ ...p, fosterCare: e.target.checked }))}
+                  className="rounded border-[var(--border)] text-amber-500"
+                />
+                Foster care
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={optionalEligibility?.underrepresentedBackground ?? false}
+                  onChange={(e) => setOptionalEligibility((p) => ({ ...p, underrepresentedBackground: e.target.checked }))}
+                  className="rounded border-[var(--border)] text-amber-500"
+                />
+                Underrepresented background
+              </label>
+              <Input
+                label="Citizenship / residency (optional)"
+                placeholder="e.g. US citizen, DACA"
+                value={optionalEligibility?.citizenshipResidency ?? ""}
+                onChange={(e) => setOptionalEligibility((p) => ({ ...p, citizenshipResidency: e.target.value }))}
+              />
+              <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
+                Save optional eligibility
+              </Button>
+            </div>
+          )}
         </Card>
 
         <Card className="space-y-3 p-4">

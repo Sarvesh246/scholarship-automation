@@ -80,9 +80,13 @@ export default function AdminScrapePage() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
+        const total = (data.expiredDeleted ?? 0) + (data.junkDeleted ?? 0);
+        const parts: string[] = [];
+        if ((data.expiredDeleted ?? 0) > 0) parts.push(`${data.expiredDeleted} expired`);
+        if ((data.junkDeleted ?? 0) > 0) parts.push(`${data.junkDeleted} junk`);
         showToast({
           title: "Cleanup completed",
-          message: `${data.deleted ?? 0} expired scholarships removed.`,
+          message: total > 0 ? `${total} removed (${parts.join(", ")})` : "No scholarships to remove.",
           variant: "success",
         });
         setResult((prev) => (prev ? { ...prev, cleanup: data } : { cleanup: data }));

@@ -21,7 +21,17 @@ export async function getProfile(): Promise<Profile> {
       activities: Array.isArray(data.activities) ? data.activities : defaultProfile.activities,
       awards: Array.isArray(data.awards) ? data.awards : defaultProfile.awards,
       demographics: data.demographics,
-      financial: data.financial ?? defaultProfile.financial
+      financial: data.financial ?? defaultProfile.financial,
+      onboardingComplete: data.onboardingComplete === true,
+      location: data.location,
+      educationLevel: data.educationLevel,
+      schoolName: data.schoolName,
+      intendedMajors: Array.isArray(data.intendedMajors) ? data.intendedMajors : undefined,
+      majorsFreeText: data.majorsFreeText,
+      timeBudgetPreference: data.timeBudgetPreference,
+      essayPreference: data.essayPreference,
+      needBasedInterest: data.needBasedInterest,
+      optionalEligibility: data.optionalEligibility,
     };
   } catch {
     return defaultProfile;
@@ -37,7 +47,17 @@ export async function saveProfile(profile: Profile): Promise<void> {
       activities: profile.activities ?? [],
       awards: profile.awards ?? [],
       demographics: profile.demographics ?? {},
-      financial: profile.financial ?? {}
+      financial: profile.financial ?? {},
+      onboardingComplete: profile.onboardingComplete === true,
+      location: profile.location ?? undefined,
+      educationLevel: profile.educationLevel,
+      schoolName: profile.schoolName,
+      intendedMajors: profile.intendedMajors,
+      majorsFreeText: profile.majorsFreeText,
+      timeBudgetPreference: profile.timeBudgetPreference,
+      essayPreference: profile.essayPreference,
+      needBasedInterest: profile.needBasedInterest,
+      optionalEligibility: profile.optionalEligibility ?? undefined,
     }, { merge: true });
   } catch {
     /* write failed */

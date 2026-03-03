@@ -26,5 +26,9 @@ service cloud.firestore {
     match /users/{userId}/essays/{essayId} {
       allow read, create, update, delete: if isOwner(userId);
     }
+
+    match /users/{userId}/essays/{essayId}/versions/{versionId} {
+      allow read, create, update, delete: if isOwner(userId);
+    }
   }
 }

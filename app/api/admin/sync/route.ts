@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/requireAdminAuth";
 import { syncFromScholarshipOwl, syncScholarshipsFromUrl, syncFromGrantsGov } from "@/lib/syncScholarships";
-import { deleteExpiredScholarships } from "@/lib/scholarshipDeadline";
+import { deleteExpiredScholarships, deleteJunkScholarships } from "@/lib/scholarshipDeadline";
+import { logSync, logError } from "@/lib/adminLog";
 
 export const dynamic = "force-dynamic";
 
@@ -29,21 +30,42 @@ export async function POST(request: Request) {
 
   const [owlRes, urlRes, grantsRes] = await Promise.all([owlPromise, urlPromise, grantsPromise]);
 
-  if (owlRes.ok === true && "created" in owlRes) results.owl = { created: owlRes.created, updated: owlRes.updated, errors: owlRes.errors?.length ? owlRes.errors : undefined };
-  else if (owlRes.ok === false && "err" in owlRes) { console.error("[admin/sync] Owl", owlRes.err); results.owlError = owlRes.err instanceof Error ? owlRes.err.message : "Owl sync failed"; }
-  else results.owl = owlRes;
+  if (owlRes.ok === true && "created" in owlRes) {
+    results.owl = { created: owlRes.created, updated: owlRes.updated, errors: owlRes.errors?.length ? owlRes.errors : undefined };
+    logSync("owl", owlRes.created, owlRes.updated, owlRes.errors).catch(() => {});
+  } else if (owlRes.ok === false && "err" in owlRes) {
+    console.error("[admin/sync] Owl", owlRes.err);
+    logError("owl", owlRes.err instanceof Error ? owlRes.err.message : "Owl sync failed").catch(() => {});
+    results.owlError = owlRes.err instanceof Error ? owlRes.err.message : "Owl sync failed";
+  } else results.owl = owlRes;
 
-  if (urlRes.ok === true && "created" in urlRes) results.url = { created: urlRes.created, updated: urlRes.updated, errors: urlRes.errors?.length ? urlRes.errors : undefined };
-  else if (urlRes.ok === false && "err" in urlRes) { console.error("[admin/sync] URL", urlRes.err); results.urlError = urlRes.err instanceof Error ? urlRes.err.message : "URL sync failed"; }
-  else results.url = urlRes;
+  if (urlRes.ok === true && "created" in urlRes) {
+    results.url = { created: urlRes.created, updated: urlRes.updated, errors: urlRes.errors?.length ? urlRes.errors : undefined };
+    logSync("url", urlRes.created, urlRes.updated, urlRes.errors).catch(() => {});
+  } else if (urlRes.ok === false && "err" in urlRes) {
+    console.error("[admin/sync] URL", urlRes.err);
+    logError("url", urlRes.err instanceof Error ? urlRes.err.message : "URL sync failed").catch(() => {});
+    results.urlError = urlRes.err instanceof Error ? urlRes.err.message : "URL sync failed";
+  } else results.url = urlRes;
 
-  if (grantsRes.ok === true && "created" in grantsRes) results.grantsGov = { created: grantsRes.created, updated: grantsRes.updated, errors: grantsRes.errors?.length ? grantsRes.errors : undefined };
-  else if ("err" in grantsRes) { console.error("[admin/sync] Grants.gov", grantsRes.err); results.grantsGovError = grantsRes.err instanceof Error ? grantsRes.err.message : "Grants.gov sync failed"; }
+  if (grantsRes.ok === true && "created" in grantsRes) {
+    results.grantsGov = { created: grantsRes.created, updated: grantsRes.updated, errors: grantsRes.errors?.length ? grantsRes.errors : undefined };
+    logSync("grantsGov", grantsRes.created, grantsRes.updated, grantsRes.errors).catch(() => {});
+  } else if ("err" in grantsRes) {
+    console.error("[admin/sync] Grants.gov", grantsRes.err);
+    logError("grantsGov", grantsRes.err instanceof Error ? grantsRes.err.message : "Grants.gov sync failed").catch(() => {});
+    results.grantsGovError = grantsRes.err instanceof Error ? grantsRes.err.message : "Grants.gov sync failed";
+  }
 
   try {
-    results.expiredDeleted = await deleteExpiredScholarships();
+    const [expiredDeleted, junkDeleted] = await Promise.all([
+      deleteExpiredScholarships(),
+      deleteJunkScholarships(),
+    ]);
+    results.expiredDeleted = expiredDeleted;
+    results.junkDeleted = junkDeleted;
   } catch (err) {
-    console.error("[admin/sync] Cleanup expired failed", err);
+    console.error("[admin/sync] Cleanup failed", err);
   }
 
   return NextResponse.json({ ok: true, ...results });

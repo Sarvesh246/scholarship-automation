@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -11,17 +12,30 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { ScholarshipRowCard } from "@/components/feature/ScholarshipRowCard";
 import { getScholarships, invalidateScholarshipCache } from "@/lib/scholarshipStorage";
 import { getApplications, ensureApplication } from "@/lib/applicationStorage";
+import { getProfile } from "@/lib/profileStorage";
 import { classifyScholarship } from "@/lib/classifyScholarship";
-import type { Scholarship, ScholarshipCategory } from "@/types";
+import { isSweepstakes } from "@/lib/scholarshipQuality";
+import {
+  computeMatchesForUser,
+  getCachedMatches,
+  invalidateMatchCache,
+  GREENLIGHT_MIN_SCORE,
+  NEAR_MATCH_MIN_SCORE,
+} from "@/lib/matchEngine";
+import { getProfileCompletion, getMissingItemsForMatchUnlock } from "@/lib/profileCompletion";
+import { useUser } from "@/hooks/useUser";
+import type { Scholarship, ScholarshipCategory, ScholarshipMatchResult } from "@/types";
 
 type SortOption = "soonest" | "amount" | "latest" | "lowest" | "title" | "effort_high" | "effort_low";
 type TypeFilter = "all" | "non_citizen" | "private" | "government";
+type DisplayCategoryFilter = "all" | "scholarships_only" | "sweepstakes_only";
 type DeadlineFilter = "any" | "7" | "30" | "60" | "90";
 type AmountFilter = "any" | "1000" | "2000" | "5000" | "10000";
 type EffortFilter = "any" | "low" | "medium" | "high";
 
 function parseEffort(estimatedTime: string): "low" | "medium" | "high" {
   const t = (estimatedTime || "").toLowerCase();
+  if (t.includes("4+") || t.includes("3–4") || t.includes("3-4")) return "high";
   if (t.includes("min") || (t.includes("30") && !t.includes("hour"))) return "low";
   if (t.includes("hour") || t.includes("1 h") || t.includes("2 h")) return "medium";
   return "high";
@@ -41,6 +55,8 @@ const CATEGORIES: { value: ScholarshipCategory; label: string }[] = [
 
 export default function ScholarshipsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const qFromUrl = searchParams.get("q") ?? "";
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("soonest");
   const [deadlineDays, setDeadlineDays] = useState<DeadlineFilter>("any");
@@ -49,6 +65,10 @@ export default function ScholarshipsPage() {
   const [effort, setEffort] = useState<EffortFilter>("any");
   const [hideExpired, setHideExpired] = useState(true);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [displayCategoryFilter, setDisplayCategoryFilter] = useState<DisplayCategoryFilter>("scholarships_only");
+  const [greenlightOn, setGreenlightOn] = useState(false);
+  const [showNearMatches, setShowNearMatches] = useState(false);
+  const [matchResults, setMatchResults] = useState<ScholarshipMatchResult[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [items, setItems] = useState<Scholarship[]>([]);
   const [applicationIds, setApplicationIds] = useState<Set<string>>(new Set());
@@ -57,18 +77,42 @@ export default function ScholarshipsPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
 
-  const loadScholarships = useCallback(async () => {
-    invalidateScholarshipCache();
+  const { user } = useUser();
+
+  const loadScholarships = useCallback(async (invalidate = false) => {
+    if (invalidate) {
+      invalidateScholarshipCache();
+      if (user?.uid) invalidateMatchCache(user.uid);
+    }
     setLoading(true);
     const [data, apps] = await Promise.all([getScholarships(), getApplications()]);
     setItems(data);
     setApplicationIds(new Set(apps.map((a) => a.scholarshipId)));
     setLoading(false);
-  }, []);
+  }, [user?.uid]);
 
   useEffect(() => {
     loadScholarships();
   }, [loadScholarships]);
+
+  useEffect(() => {
+    if (!user?.uid || items.length === 0) return;
+    const run = async () => {
+      const profile = await getProfile();
+      const cached = getCachedMatches(user.uid);
+      if (cached && cached.length === items.length) {
+        setMatchResults(cached);
+        return;
+      }
+      const results = await computeMatchesForUser(user.uid, profile, items);
+      setMatchResults(results);
+    };
+    run();
+  }, [user?.uid, items]);
+
+  useEffect(() => {
+    if (qFromUrl !== "" && qFromUrl !== query) setQuery(qFromUrl);
+  }, [qFromUrl]);
 
   const filtered = useMemo(() => {
     const now = new Date();
@@ -79,6 +123,10 @@ export default function ScholarshipsPage() {
     const minAmountNum = minAmount !== "any" ? parseInt(minAmount, 10) : 0;
 
     return items.filter((s) => {
+      if (s.status === "draft") return false;
+      const isSweepstakesItem = s.displayCategory === "sweepstakes" || (s.displayCategory == null && isSweepstakes(s));
+      if (displayCategoryFilter === "scholarships_only" && isSweepstakesItem) return false;
+      if (displayCategoryFilter === "sweepstakes_only" && !isSweepstakesItem) return false;
       if (typeFilter !== "all") {
         const { scholarshipType, nonCitizenEligible } = classifyScholarship(s);
         if (typeFilter === "non_citizen" && !nonCitizenEligible) return false;
@@ -98,13 +146,41 @@ export default function ScholarshipsPage() {
       if (applicationIds.has(s.id)) return false;
       return true;
     });
-  }, [items, query, deadlineDays, minAmount, category, effort, hideExpired, applicationIds, typeFilter]);
+  }, [items, query, deadlineDays, minAmount, category, effort, hideExpired, applicationIds, typeFilter, displayCategoryFilter]);
+
+  const matchResultsMap = useMemo(() => {
+    const m = new Map<string, ScholarshipMatchResult>();
+    matchResults.forEach((r) => m.set(r.scholarshipId, r));
+    return m;
+  }, [matchResults]);
+
+  const greenlightFiltered = useMemo(() => {
+    if (!greenlightOn) return filtered;
+    const minScore = showNearMatches ? NEAR_MATCH_MIN_SCORE : GREENLIGHT_MIN_SCORE;
+    return filtered.filter((s) => {
+      if (s.displayCategory === "sweepstakes") return false;
+      const match = matchResultsMap.get(s.id);
+      if (!match) return false;
+      if (showNearMatches)
+        return (match.eligibilityStatus === "eligible" && match.matchScore >= GREENLIGHT_MIN_SCORE) ||
+          (match.eligibilityStatus === "may_not_be_eligible" && match.matchScore >= NEAR_MATCH_MIN_SCORE);
+      return match.eligibilityStatus === "eligible" && match.matchScore >= minScore;
+    });
+  }, [filtered, greenlightOn, showNearMatches, matchResultsMap]);
 
   const sorted = useMemo(() => {
-    const list = [...filtered];
+    const list = greenlightOn ? [...greenlightFiltered] : [...filtered];
     const getDeadline = (s: Scholarship) => (s.deadline ? new Date(s.deadline).getTime() : 0);
     const getAmount = (s: Scholarship) => s.amount ?? 0;
-    if (sortBy === "soonest") list.sort((a, b) => getDeadline(a) - getDeadline(b));
+    const getMatchScore = (s: Scholarship) => matchResultsMap.get(s.id)?.matchScore ?? 0;
+    if (greenlightOn) {
+      list.sort((a, b) => {
+        const sa = getMatchScore(a);
+        const sb = getMatchScore(b);
+        if (sb !== sa) return sb - sa;
+        return getDeadline(a) - getDeadline(b);
+      });
+    } else if (sortBy === "soonest") list.sort((a, b) => getDeadline(a) - getDeadline(b));
     else if (sortBy === "latest") list.sort((a, b) => getDeadline(b) - getDeadline(a));
     else if (sortBy === "amount") list.sort((a, b) => getAmount(b) - getAmount(a));
     else if (sortBy === "lowest") list.sort((a, b) => getAmount(a) - getAmount(b));
@@ -112,17 +188,20 @@ export default function ScholarshipsPage() {
     else if (sortBy === "effort_high") list.sort((a, b) => effortRank(parseEffort(b.estimatedTime || "")) - effortRank(parseEffort(a.estimatedTime || "")));
     else if (sortBy === "effort_low") list.sort((a, b) => effortRank(parseEffort(a.estimatedTime || "")) - effortRank(parseEffort(b.estimatedTime || "")));
     return list;
-  }, [filtered, sortBy]);
+  }, [greenlightFiltered, filtered, greenlightOn, sortBy, matchResultsMap]);
 
-  const totalPages = Math.ceil(sorted.length / perPage) || 1;
+  const featured = useMemo(() => sorted.filter((s) => s.featured), [sorted]);
+  const nonFeatured = useMemo(() => sorted.filter((s) => !s.featured), [sorted]);
+  const displayList = useMemo(() => [...featured, ...nonFeatured], [featured, nonFeatured]);
+  const totalPages = Math.ceil(displayList.length / perPage) || 1;
   const paginated = useMemo(() => {
     const start = (page - 1) * perPage;
-    return sorted.slice(start, start + perPage);
-  }, [sorted, page, perPage]);
+    return displayList.slice(start, start + perPage);
+  }, [displayList, page, perPage]);
 
   useEffect(() => {
     setPage(1);
-  }, [query, sortBy, deadlineDays, minAmount, category, effort, hideExpired, typeFilter]);
+  }, [query, sortBy, deadlineDays, minAmount, category, effort, hideExpired, typeFilter, displayCategoryFilter]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -130,7 +209,7 @@ export default function ScholarshipsPage() {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadScholarships();
+    await loadScholarships(true);
     setRefreshing(false);
   }, [loadScholarships]);
 
@@ -175,6 +254,34 @@ export default function ScholarshipsPage() {
         }
       />
 
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setGreenlightOn((v) => !v)}
+          className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-all ${
+            greenlightOn
+              ? "bg-emerald-500/25 text-emerald-400 border-2 border-emerald-500/50 shadow-lg shadow-emerald-500/10"
+              : "bg-[var(--surface)] text-[var(--muted)] border-2 border-[var(--border)] hover:border-emerald-500/30 hover:text-[var(--text)]"
+          }`}
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          Greenlight
+        </button>
+        {greenlightOn && (
+          <p className="text-xs text-[var(--muted)]">
+            Only scholarships you&apos;re eligible for, based on your profile.
+          </p>
+        )}
+      </div>
+
+      {greenlightOn && (
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          <strong>Greenlight Mode:</strong> Only scholarships you&apos;re eligible for. Based on your profile.
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2">
         <div className="flex w-full flex-wrap items-center gap-2 border-b border-[var(--border)] pb-3">
           <span className="text-xs font-medium text-[var(--muted)]">Show:</span>
@@ -187,9 +294,30 @@ export default function ScholarshipsPage() {
             <button
               key={opt.value}
               type="button"
-              onClick={() => setTypeFilter(opt.value)}
+              onClick={() => { setTypeFilter(opt.value); setPage(1); }}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 typeFilter === opt.value
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                  : "border border-[var(--border)] text-[var(--muted)] hover:border-amber-500/30 hover:text-[var(--text)]"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex w-full flex-wrap items-center gap-2 border-b border-[var(--border)] pb-3">
+          <span className="text-xs font-medium text-[var(--muted)]">Catalog:</span>
+          {[
+            { value: "scholarships_only" as DisplayCategoryFilter, label: "Scholarships only" },
+            { value: "sweepstakes_only" as DisplayCategoryFilter, label: "Sweepstakes only" },
+            { value: "all" as DisplayCategoryFilter, label: "All" },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { setDisplayCategoryFilter(opt.value); setPage(1); }}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                displayCategoryFilter === opt.value
                   ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                   : "border border-[var(--border)] text-[var(--muted)] hover:border-amber-500/30 hover:text-[var(--text)]"
               }`}
@@ -239,20 +367,89 @@ export default function ScholarshipsPage() {
         >
           Filters
         </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={(e) => {
+            setQuery("");
+            setSortBy("soonest");
+            setDeadlineDays("any");
+            setMinAmount("any");
+            setCategory("any");
+            setEffort("any");
+            setTypeFilter("all");
+            setDisplayCategoryFilter("scholarships_only");
+            setGreenlightOn(false);
+            setShowNearMatches(false);
+            setHideExpired(true);
+            setPage(1);
+            (e.currentTarget as HTMLButtonElement).blur();
+          }}
+          className="outline-none focus:outline-none focus:ring-0"
+        >
+          Clear all
+        </Button>
         </div>
       </div>
 
-      {sorted.length > 0 && (
+      {displayList.length > 0 && (
         <p className="text-sm text-[var(--muted)]">
-          Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, sorted.length)} of {sorted.length} scholarships
+          Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, displayList.length)} of {displayList.length} scholarships
+          {featured.length > 0 && (
+            <span className="ml-2 text-amber-400">{featured.length} featured</span>
+          )}
         </p>
       )}
 
       <div className="space-y-3">
-        {sorted.length === 0 ? (
-          <p className="py-8 text-center text-sm text-[var(--muted)]">
-            No scholarships found. Try a different search or filters.
-          </p>
+        {displayList.length === 0 ? (
+          greenlightOn ? (
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
+              <p className="text-sm font-medium text-[var(--text)]">No Greenlight matches yet</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                Add profile details to unlock matches, or browse all scholarships.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                {!showNearMatches ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowNearMatches(true)}
+                  >
+                    Show Near Matches (50–69%)
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowNearMatches(false)}
+                  >
+                    Hide Near Matches
+                  </Button>
+                )}
+                <Link href="/app/profile">
+                  <Button type="button" variant="primary" size="sm">
+                    Add profile details
+                  </Button>
+                </Link>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setGreenlightOn(false)}
+                >
+                  Browse all scholarships
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="py-8 text-center text-sm text-[var(--muted)]">
+              No scholarships found. Try a different search or filters.
+            </p>
+          )
         ) : (
           paginated.map((scholarship) => (
             <ScholarshipRowCard
@@ -260,6 +457,7 @@ export default function ScholarshipsPage() {
               scholarship={scholarship}
               hasApplication={false}
               onStartApplication={handleStartApplication}
+              matchResult={greenlightOn ? matchResultsMap.get(scholarship.id) : undefined}
             />
           ))
         )}

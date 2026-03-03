@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -8,9 +9,11 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
-import { getScholarships, invalidateScholarshipCache } from "@/lib/scholarshipStorage";
+import { getScholarshipsForAdmin, invalidateScholarshipCache } from "@/lib/scholarshipStorage";
 import { useAdmin, getIdToken } from "@/hooks/useAdmin";
+import { MAX_PRIZE_AMOUNT, titleLooksInstitutional } from "@/lib/institutionalGrantFilter";
 import type { Scholarship } from "@/types";
+import { formatCategoryDisplay, decodeHtmlEntities } from "@/lib/utils";
 import type { ScholarshipCategory } from "@/types";
 
 const CATEGORIES: ScholarshipCategory[] = ["STEM", "Arts", "Community", "Leadership", "FinancialNeed"];
@@ -35,6 +38,7 @@ function parseLines(s: string): string[] {
 }
 
 export default function AdminScholarshipsPage() {
+  const searchParams = useSearchParams();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { showToast } = useToast();
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
@@ -46,7 +50,7 @@ export default function AdminScholarshipsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<Scholarship | null>(null);
 
   const load = useCallback(async () => {
-    const list = await getScholarships();
+    const list = await getScholarshipsForAdmin();
     setScholarships(list);
     setLoading(false);
   }, []);
@@ -54,6 +58,28 @@ export default function AdminScholarshipsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const editId = searchParams.get("edit");
+  useEffect(() => {
+    if (!editId || scholarships.length === 0 || formOpen) return;
+    const s = scholarships.find((x) => x.id === editId);
+    if (s) {
+      setEditing(s);
+      setForm({
+        title: s.title,
+        sponsor: s.sponsor,
+        amount: String(s.amount),
+        deadline: s.deadline,
+        description: s.description,
+        estimatedTime: s.estimatedTime,
+        categoryTags: s.categoryTags,
+        eligibilityTags: (s.eligibilityTags ?? []).join("\n"),
+        prompts: (s.prompts ?? []).join("\n")
+      });
+      setFormOpen(true);
+      window.history.replaceState(null, "", "/app/admin/scholarships");
+    }
+  }, [editId, scholarships, formOpen]);
 
   if (adminLoading) {
     return (
@@ -115,6 +141,22 @@ export default function AdminScholarshipsPage() {
     if (!form.title.trim()) {
       showToast({ title: "Title is required", variant: "danger" });
       return;
+    }
+    const amountNum = form.amount ? Number(form.amount) : 0;
+    if (Number.isFinite(amountNum) && amountNum > MAX_PRIZE_AMOUNT) {
+      showToast({
+        title: "Amount too high",
+        message: `Prize amount cannot exceed $${MAX_PRIZE_AMOUNT.toLocaleString()}. These are hidden from the app.`,
+        variant: "danger",
+      });
+      return;
+    }
+    if (titleLooksInstitutional(form.title.trim())) {
+      showToast({
+        title: "Title looks like an institutional grant",
+        message: "This may be hidden from students. Use a student-facing title if this is for individuals.",
+        variant: "default",
+      });
     }
     setSaving(true);
     try {
@@ -232,7 +274,7 @@ export default function AdminScholarshipsPage() {
             scholarships.map((s) => (
               <Card key={s.id} className="flex min-w-0 flex-wrap items-center justify-between gap-4 p-4">
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium truncate">{s.title}</p>
+                  <p className="font-medium truncate">{decodeHtmlEntities(s.title)}</p>
                   <p className="text-xs text-[var(--muted-2)]">{s.sponsor} · ${s.amount.toLocaleString()} · {s.deadline}</p>
                 </div>
                 <div className="flex gap-2 shrink-0">
@@ -324,7 +366,7 @@ export default function AdminScholarshipsPage() {
                       : "border border-[var(--border)] text-[var(--muted)] hover:border-amber-500/30"
                   }`}
                 >
-                  {c}
+                  {formatCategoryDisplay(c)}
                 </button>
               ))}
             </div>
@@ -336,7 +378,7 @@ export default function AdminScholarshipsPage() {
               rows={3}
               value={form.eligibilityTags}
               onChange={(e) => setForm((p) => ({ ...p, eligibilityTags: e.target.value }))}
-              placeholder="Undergraduate&#10;3.0+ GPA"
+              placeholder={["Undergraduate", "3.0+ GPA"].join("\n")}
             />
           </div>
           <div>
@@ -355,7 +397,7 @@ export default function AdminScholarshipsPage() {
       <Modal
         open={!!deleteConfirm}
         title="Delete scholarship?"
-        description={`"${deleteConfirm?.title}" will be removed. Students with an application in progress will see "Application not found."`}
+        description={`"${deleteConfirm ? decodeHtmlEntities(deleteConfirm.title) : ""}" will be removed. Students with an application in progress will see "Application not found."`}
         primaryLabel="Delete"
         onClose={() => setDeleteConfirm(null)}
         onPrimary={() => { if (deleteConfirm) void handleDelete(deleteConfirm); }}

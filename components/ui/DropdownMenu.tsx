@@ -9,6 +9,7 @@ interface DropdownMenuProps {
   align?: "start" | "end";
   contentClassName?: string;
   ariaLabel?: string;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function DropdownMenu({
@@ -16,10 +17,19 @@ export function DropdownMenu({
   children,
   align = "end",
   contentClassName,
-  ariaLabel
+  ariaLabel,
+  onOpenChange
 }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const prevOpenRef = useRef(open);
+
+  useEffect(() => {
+    if (prevOpenRef.current && !open) {
+      onOpenChange?.(false);
+    }
+    prevOpenRef.current = open;
+  }, [open, onOpenChange]);
 
   useEffect(() => {
     if (!open) return;

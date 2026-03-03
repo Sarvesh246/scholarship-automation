@@ -15,9 +15,13 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { ensureApplication, getApplication } from "@/lib/applicationStorage";
 import { getScholarship } from "@/lib/scholarshipStorage";
+import { getEssays } from "@/lib/essayStorage";
+import { matchEssaysToScholarship } from "@/lib/essayMatching";
 import { getProfile } from "@/lib/profileStorage";
 import { getProfileFieldValues, checkEligibility } from "@/lib/eligibility";
 import { useUser } from "@/hooks/useUser";
+import { getIdToken } from "@/hooks/useAdmin";
+import { formatCategoryDisplay, decodeHtmlEntities } from "@/lib/utils";
 import type { Scholarship } from "@/types";
 import type { Profile } from "@/types";
 
@@ -32,6 +36,11 @@ export default function ScholarshipDetailClient() {
   const [owlApplyOpen, setOwlApplyOpen] = useState(false);
   const [tab, setTab] = useState<"overview" | "requirements" | "prompts" | "checklist">("overview");
   const [responses, setResponses] = useState<Record<string, string>>({});
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackType, setFeedbackType] = useState("bad_scholarship");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [suggestedEssays, setSuggestedEssays] = useState<{ id: string; title: string; wordCount: number }[]>([]);
   const { showToast } = useToast();
   const router = useRouter();
   const { user } = useUser();
@@ -40,13 +49,26 @@ export default function ScholarshipDetailClient() {
     const s = await getScholarship(id);
     setScholarship(s);
     if (s) {
-      const [existing, profileData] = await Promise.all([
+      const [existing, profileData, essaysList] = await Promise.all([
         getApplication(id),
-        s.source === "scholarship_owl" ? getProfile() : Promise.resolve(null)
+        s.source === "scholarship_owl" ? getProfile() : Promise.resolve(null),
+        (s.prompts ?? []).length > 0 ? getEssays() : Promise.resolve([])
       ]);
       setHasApplication(!!existing);
       setApplication(existing ?? null);
       setProfile(profileData ?? null);
+      if ((s.prompts ?? []).length > 0 && essaysList.length > 0) {
+        setSuggestedEssays(matchEssaysToScholarship(essaysList, s).map((e) => ({ id: e.id, title: e.title, wordCount: e.wordCount })));
+      } else {
+        setSuggestedEssays([]);
+      }
+      if (existing?.promptResponses?.length) {
+        const next: Record<string, string> = {};
+        existing.promptResponses.forEach((r, i) => {
+          next[i] = r.response ?? "";
+        });
+        setResponses(next);
+      }
     }
     setLoading(false);
   }, [id]);
@@ -94,6 +116,43 @@ export default function ScholarshipDetailClient() {
     router.push(`/app/applications/${scholarship!.id}`);
   };
 
+  const handleFeedback = async () => {
+    const msg = feedbackMessage.trim();
+    if (msg.length < 10) {
+      showToast({ title: "Please enter at least 10 characters", variant: "danger" });
+      return;
+    }
+    const token = await getIdToken();
+    if (!token) {
+      showToast({ title: "Sign in to submit feedback", variant: "danger" });
+      return;
+    }
+    setFeedbackSubmitting(true);
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          type: feedbackType,
+          message: msg,
+          scholarshipId: scholarship!.id,
+        }),
+      });
+      if (res.ok) {
+        showToast({ title: "Feedback submitted", message: "Thank you for helping improve our database.", variant: "success" });
+        setFeedbackMessage("");
+        setFeedbackOpen(false);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast({ title: "Could not submit", message: data.error, variant: "danger" });
+      }
+    } catch {
+      showToast({ title: "Could not submit feedback", variant: "danger" });
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
+
   const isOwl = scholarship?.source === "scholarship_owl";
   const isExpired = !!scholarship?.expiredAt;
   const profileValues = profile
@@ -137,8 +196,8 @@ export default function ScholarshipDetailClient() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={scholarship.title}
-        subtitle={scholarship.sponsor}
+        title={decodeHtmlEntities(scholarship.title)}
+        subtitle={decodeHtmlEntities(scholarship.sponsor)}
         primaryAction={
           <div className="flex flex-wrap items-center gap-2">
             {isOwl && canApplyOwl && (
@@ -155,6 +214,7 @@ export default function ScholarshipDetailClient() {
               onClick={hasApplication ? handleContinue : handleStart}
               disabled={(!user && !hasApplication) || isExpired}
               variant={isOwl && canApplyOwl ? "secondary" : "primary"}
+              title={!user && !hasApplication ? "Waiting for sign-in…" : undefined}
             >
               {!user && !hasApplication
                 ? "Loading…"
@@ -180,6 +240,21 @@ export default function ScholarshipDetailClient() {
       <div className="grid gap-6 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2 text-xs">
+            {scholarship.verificationStatus === "approved" && (
+              <span title="Screened by our quality checks">
+                <Badge variant="success">Verified</Badge>
+              </span>
+            )}
+            {scholarship.lastVerifiedAt && (
+              <span className="text-[var(--muted-2)]">
+                Last verified:{" "}
+                {typeof scholarship.lastVerifiedAt === "string"
+                  ? new Date(scholarship.lastVerifiedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+                  : scholarship.lastVerifiedAt && typeof scholarship.lastVerifiedAt === "object" && "_seconds" in scholarship.lastVerifiedAt
+                    ? new Date((scholarship.lastVerifiedAt as { _seconds: number })._seconds * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+                    : "—"}
+              </span>
+            )}
             {isExpired && <Badge variant="danger">Expired</Badge>}
             {scholarship.recurring && !isExpired && (
               <Badge variant="info">
@@ -202,13 +277,13 @@ export default function ScholarshipDetailClient() {
               })}
             </Badge>
             <Badge variant="success">
-              Amount: ${scholarship.amount.toLocaleString()}
+              Amount: {(scholarship.amount ?? 0) > 0 ? `$${scholarship.amount.toLocaleString()}` : "Varies"}
             </Badge>
           </div>
 
           <div className="flex flex-wrap gap-2">
             {(scholarship.categoryTags ?? []).map((tag) => (
-              <Tag key={tag}>{tag}</Tag>
+              <Tag key={tag}>{formatCategoryDisplay(tag)}</Tag>
             ))}
           </div>
 
@@ -251,7 +326,7 @@ export default function ScholarshipDetailClient() {
               {(scholarship.eligibilityTags ?? []).length > 0 ? (
                 <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-[var(--muted)]">
                   {(scholarship.eligibilityTags ?? []).map((tag) => (
-                    <li key={tag}>{tag}</li>
+                    <li key={tag}>{decodeHtmlEntities(tag)}</li>
                   ))}
                 </ul>
               ) : (
@@ -264,6 +339,23 @@ export default function ScholarshipDetailClient() {
 
           {tab === "prompts" && (scholarship.prompts ?? []).length > 0 && (
             <div className="space-y-3">
+              {suggestedEssays.length > 0 && (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                  <p className="text-xs font-medium text-amber-400 mb-2">Suggested essays</p>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestedEssays.map((e) => (
+                      <Link
+                        key={e.id}
+                        href={`/app/essays/${e.id}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-400 hover:bg-amber-500/20"
+                      >
+                        {e.title}
+                        <span className="text-[var(--muted-2)]">({e.wordCount}w)</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
               {(scholarship.prompts ?? []).map((prompt, index) => (
                 <PromptBlock
                   key={index}
@@ -316,7 +408,7 @@ export default function ScholarshipDetailClient() {
             </div>
             <div className="flex justify-between">
               <dt>Category</dt>
-              <dd>{(scholarship.categoryTags ?? []).join(", ")}</dd>
+              <dd>{(scholarship.categoryTags ?? []).map(formatCategoryDisplay).join(", ")}</dd>
             </div>
             {(scholarship.prompts ?? []).length > 0 && (
             <div className="flex justify-between">
@@ -343,6 +435,45 @@ export default function ScholarshipDetailClient() {
           });
         }}
       />
+
+      <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+        <button
+          type="button"
+          onClick={() => setFeedbackOpen(!feedbackOpen)}
+          className="text-sm font-medium text-[var(--muted)] hover:text-amber-400 transition-colors"
+        >
+          {feedbackOpen ? "−" : "+"} Report a problem or duplicate
+        </button>
+        {feedbackOpen && (
+          <div className="mt-3 space-y-3">
+            <select
+              value={feedbackType}
+              onChange={(e) => setFeedbackType(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm"
+            >
+              <option value="bad_scholarship">Bad or incorrect info</option>
+              <option value="duplicate">Duplicate scholarship</option>
+              <option value="expired">Already expired</option>
+              <option value="general">Other</option>
+            </select>
+            <textarea
+              value={feedbackMessage}
+              onChange={(e) => setFeedbackMessage(e.target.value)}
+              placeholder="Describe the issue (at least 10 characters)..."
+              rows={3}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm placeholder:text-[var(--muted-2)]"
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleFeedback}
+              disabled={feedbackSubmitting || feedbackMessage.trim().length < 10}
+            >
+              {feedbackSubmitting ? "Sending…" : "Submit feedback"}
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

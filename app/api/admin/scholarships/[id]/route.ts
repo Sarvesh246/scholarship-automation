@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/requireAdminAuth";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
 import { enrichWithClassification } from "@/lib/classifyScholarship";
+import { MAX_PRIZE_AMOUNT } from "@/lib/institutionalGrantFilter";
 import type { Scholarship } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,15 @@ export async function PATCH(
     if (body.sponsor !== undefined) updates.sponsor = String(body.sponsor).trim();
     if (body.amount !== undefined) {
       const n = Number(body.amount);
-      if (Number.isFinite(n)) updates.amount = n;
+      if (Number.isFinite(n)) {
+        if (n > MAX_PRIZE_AMOUNT) {
+          return NextResponse.json(
+            { error: `Amount cannot exceed $${MAX_PRIZE_AMOUNT.toLocaleString()}` },
+            { status: 400 }
+          );
+        }
+        updates.amount = n;
+      }
     }
     if (body.deadline !== undefined) updates.deadline = String(body.deadline).trim();
     if (body.description !== undefined) updates.description = String(body.description).trim();

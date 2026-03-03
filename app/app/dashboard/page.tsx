@@ -174,7 +174,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        subtitle={`You have ${dueSoon} deadline${dueSoon === 1 ? "" : "s"} this week.`}
+        subtitle={dueSoon === 0 ? "No deadlines this week. Browse scholarships to get started." : `You have ${dueSoon} deadline${dueSoon === 1 ? "" : "s"} this week.`}
         primaryAction={
           <Link
             href="/app/scholarships"
@@ -205,10 +205,25 @@ export default function DashboardPage() {
         <h2 className="text-sm font-medium text-[var(--muted)]">
           Applications pipeline
         </h2>
-        <PipelineBoard
-          applications={pipelineCards}
-          getCardHref={(applicationId) => `/app/applications/${applicationId}`}
-        />
+        {pipelineCards.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-8 text-center">
+            <p className="text-sm font-medium text-[var(--text)]">No applications yet</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              Browse scholarships and start an application to see it here.
+            </p>
+            <Link
+              href="/app/scholarships"
+              className="btn-gold mt-4 inline-flex text-sm py-2 px-5"
+            >
+              Browse scholarships
+            </Link>
+          </div>
+        ) : (
+          <PipelineBoard
+            applications={pipelineCards}
+            getCardHref={(applicationId) => `/app/applications/${applicationId}`}
+          />
+        )}
       </div>
 
     </div>

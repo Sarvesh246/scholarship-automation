@@ -22,6 +22,7 @@ const URGENT_DAYS = 3;
 export function useNotifications() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -105,9 +106,12 @@ export function useNotifications() {
         return tA - tB;
       });
 
-      setItems(notifications.slice(0, 10));
+      const list = notifications.slice(0, 10);
+      setItems(list);
+      setUnreadCount(list.length);
     } catch {
       setItems([]);
+      setUnreadCount(0);
     } finally {
       setLoading(false);
     }
@@ -117,5 +121,7 @@ export function useNotifications() {
     load();
   }, [load]);
 
-  return { items, loading, refresh: load };
+  const markAllAsRead = useCallback(() => setUnreadCount(0), []);
+
+  return { items, loading, refresh: load, unreadCount, markAllAsRead };
 }

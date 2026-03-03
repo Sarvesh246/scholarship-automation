@@ -1,7 +1,7 @@
 import { memo } from "react";
 import Link from "next/link";
 import { ApplicationStatus } from "@/types";
-import { cn } from "@/lib/utils";
+import { cn, decodeHtmlEntities } from "@/lib/utils";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Badge } from "@/components/ui/Badge";
 
@@ -39,14 +39,32 @@ const OWL_STATUS_LABEL: Record<string, string> = {
 
 const ApplicationCard = memo(function ApplicationCard({
   card,
-  href
+  href,
+  onDelete
 }: {
   card: PipelineCardData;
   href?: string;
+  onDelete?: (applicationId: string) => void;
 }) {
   const content = (
     <>
-      <p className="text-sm font-semibold leading-snug">{card.title}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-semibold leading-snug min-w-0 flex-1">{decodeHtmlEntities(card.title)}</p>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete(card.id);
+            }}
+            className="shrink-0 rounded p-1 text-[10px] text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+            aria-label="Delete application"
+          >
+            Delete
+          </button>
+        )}
+      </div>
       {card.status === "submitted" && card.owlStatus && (
         <Badge
           variant={
@@ -97,19 +115,35 @@ interface PipelineBoardProps {
   applications: PipelineCardData[];
   /** When provided, each card links to this path (receives application id). Omit on dashboard to keep cards non-clickable. */
   getCardHref?: (applicationId: string) => string;
+  /** When provided, each card shows a delete button that calls this with the application id. */
+  onDelete?: (applicationId: string) => void;
 }
 
-export function PipelineBoard({ applications, getCardHref }: PipelineBoardProps) {
-  const columns: { title: string; status: ApplicationStatus }[] = [
-    { title: "Not started", status: "not_started" },
-    { title: "Drafting", status: "drafting" },
-    { title: "Reviewing", status: "reviewing" },
-    { title: "Submitted", status: "submitted" }
-  ];
+const COLUMNS: { title: string; status: ApplicationStatus }[] = [
+  { title: "Not started", status: "not_started" },
+  { title: "Drafting", status: "drafting" },
+  { title: "Reviewing", status: "reviewing" },
+  { title: "Submitted", status: "submitted" }
+];
+
+function groupByStatus(applications: PipelineCardData[]) {
+  const map = new Map<ApplicationStatus, PipelineCardData[]>();
+  for (const a of applications) {
+    const list = map.get(a.status) ?? [];
+    list.push(a);
+    map.set(a.status, list);
+  }
+  return map;
+}
+
+export function PipelineBoard({ applications, getCardHref, onDelete }: PipelineBoardProps) {
+  const byStatus = groupByStatus(applications);
 
   return (
     <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-      {columns.map((column) => (
+      {COLUMNS.map((column) => {
+        const columnApps = byStatus.get(column.status) ?? [];
+        return (
         <div
           key={column.status}
           className="flex flex-col gap-3 rounded-xl bg-[var(--bg-secondary)] p-3 min-w-0"
@@ -119,28 +153,27 @@ export function PipelineBoard({ applications, getCardHref }: PipelineBoardProps)
               {column.title}
             </span>
             <span className="rounded-full bg-[var(--surface)] px-2 py-0.5 text-[10px] text-[var(--muted-2)]">
-              {applications.filter((a) => a.status === column.status).length}
+              {columnApps.length}
             </span>
           </div>
           <div className={cn("space-y-2", "min-h-[60px]")}>
-            {applications
-              .filter((a) => a.status === column.status)
-              .map((card) => (
+            {columnApps.map((card) => (
                 <ApplicationCard
                   key={card.id}
                   card={card}
                   href={getCardHref?.(card.id)}
+                  onDelete={onDelete}
                 />
               ))}
-            {applications.filter((a) => a.status === column.status).length ===
-              0 && (
+            {columnApps.length === 0 && (
               <p className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-2 py-3 text-[10px] text-[var(--muted-2)]">
                 No applications here yet.
               </p>
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

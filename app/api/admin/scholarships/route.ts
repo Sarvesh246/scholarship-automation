@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/requireAdminAuth";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
 import { enrichWithClassification } from "@/lib/classifyScholarship";
+import { MAX_PRIZE_AMOUNT } from "@/lib/institutionalGrantFilter";
 import type { Scholarship } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,13 @@ export async function POST(request: NextRequest) {
 
     if (!title) {
       return NextResponse.json({ error: "title is required" }, { status: 400 });
+    }
+    const amountNum = Number.isFinite(Number(body.amount)) ? Number(body.amount) : 0;
+    if (amountNum > MAX_PRIZE_AMOUNT) {
+      return NextResponse.json(
+        { error: `Amount cannot exceed $${MAX_PRIZE_AMOUNT.toLocaleString()}` },
+        { status: 400 }
+      );
     }
 
     const id = body.id && String(body.id).trim() ? String(body.id).trim() : slugify(title);

@@ -11,7 +11,9 @@ export default function AdminSyncPage() {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { showToast } = useToast();
   const [syncing, setSyncing] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [validationResult, setValidationResult] = useState<Record<string, unknown> | null>(null);
 
   const runSync = async () => {
     const token = await getIdToken();
@@ -56,6 +58,42 @@ export default function AdminSyncPage() {
       setResult({ error: e instanceof Error ? e.message : "Request failed" });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const runValidation = async () => {
+    const token = await getIdToken();
+    if (!token) {
+      showToast({ title: "Not signed in", variant: "danger" });
+      return;
+    }
+    setValidating(true);
+    setValidationResult(null);
+    try {
+      const res = await fetch("/api/admin/validate-scholarships", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      setValidationResult(data);
+      if (res.ok) {
+        showToast({
+          title: "Validation complete",
+          message: `${data.totalProcessed ?? 0} processed, ${data.expiredRemoved ?? 0} expired removed.`,
+          variant: "success",
+        });
+      } else {
+        showToast({ title: "Validation failed", message: data.error ?? "See result below.", variant: "danger" });
+      }
+    } catch (e) {
+      showToast({
+        title: "Validation failed",
+        message: e instanceof Error ? e.message : "Something went wrong.",
+        variant: "danger",
+      });
+      setValidationResult({ error: e instanceof Error ? e.message : "Request failed" });
+    } finally {
+      setValidating(false);
     }
   };
 
@@ -104,6 +142,32 @@ export default function AdminSyncPage() {
           Same logic as the cron job; no CRON_SECRET needed when run from Admin.
         </p>
       </Card>
+
+      <Card className="p-4">
+        <h3 className="font-medium text-[var(--text)]">STEP 0 — Full validation pass</h3>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Run quality verification on all scholarships: set qualityScore, verificationStatus, domainTrustScore,
+          displayCategory, lastVerifiedAt. Removes expired. Only approved (score ≥70) show in the app.
+        </p>
+        <Button
+          type="button"
+          variant="secondary"
+          className="mt-3"
+          onClick={runValidation}
+          disabled={validating}
+        >
+          {validating ? "Validating…" : "Run full validation now"}
+        </Button>
+      </Card>
+
+      {validationResult != null && (
+        <Card className="p-4">
+          <h3 className="mb-2 text-sm font-medium text-[var(--text)]">Validation result</h3>
+          <pre className="max-h-48 overflow-auto rounded-lg bg-[var(--bg)] p-3 text-xs text-[var(--muted)]">
+            {JSON.stringify(validationResult, null, 2)}
+          </pre>
+        </Card>
+      )}
 
       {result != null && (
         <Card className="p-4">
