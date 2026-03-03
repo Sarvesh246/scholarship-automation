@@ -17,6 +17,26 @@ function unescapePrivateKey(key: string | undefined): string | undefined {
   return key.replace(/\\n/g, "\n");
 }
 
+/** Google's JSON uses private_key; ServiceAccount expects privateKey. */
+interface RawServiceAccount {
+  project_id?: string;
+  projectId?: string;
+  client_email?: string;
+  clientEmail?: string;
+  private_key?: string;
+  privateKey?: string;
+}
+
+function normalizeToServiceAccount(raw: RawServiceAccount): ServiceAccount {
+  const privateKey =
+    unescapePrivateKey(raw.private_key ?? raw.privateKey) ?? raw.privateKey ?? raw.private_key;
+  return {
+    projectId: raw.projectId ?? raw.project_id,
+    clientEmail: raw.clientEmail ?? raw.client_email,
+    privateKey,
+  } as ServiceAccount;
+}
+
 function getServiceAccount(): ServiceAccount | undefined {
   // Prefer separate env vars (common on Vercel: paste private_key with \n as \\n)
   const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -33,11 +53,8 @@ function getServiceAccount(): ServiceAccount | undefined {
   const key = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (key) {
     try {
-      const parsed = JSON.parse(key) as ServiceAccount;
-      if (typeof parsed.private_key === "string") {
-        parsed.private_key = unescapePrivateKey(parsed.private_key) ?? parsed.private_key;
-      }
-      return parsed;
+      const parsed = JSON.parse(key) as RawServiceAccount;
+      return normalizeToServiceAccount(parsed);
     } catch {
       return undefined;
     }
@@ -48,11 +65,8 @@ function getServiceAccount(): ServiceAccount | undefined {
     const fs = require("fs");
     const p = path.join(process.cwd(), "scripts", "serviceAccountKey.json");
     if (fs.existsSync(p)) {
-      const parsed = JSON.parse(fs.readFileSync(p, "utf-8")) as ServiceAccount;
-      if (typeof parsed.private_key === "string") {
-        parsed.private_key = unescapePrivateKey(parsed.private_key) ?? parsed.private_key;
-      }
-      return parsed;
+      const parsed = JSON.parse(fs.readFileSync(p, "utf-8")) as RawServiceAccount;
+      return normalizeToServiceAccount(parsed);
     }
   } catch {
     // ignore
