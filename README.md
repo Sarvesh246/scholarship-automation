@@ -92,15 +92,24 @@ Vercel is the recommended deployment platform for this app. It supports full Nex
 
 ### 2. Environment variables
 
-In **Project Settings → Environment Variables**, add:
+In **Project Settings → Environment Variables**, add (for Production; same values as in `.env.local`):
+
+- **Firebase (required for auth and for scholarships to load):**
   - `NEXT_PUBLIC_FIREBASE_API_KEY`
   - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
   - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
   - `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
   - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
   - `NEXT_PUBLIC_FIREBASE_APP_ID`
+  - `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` (optional)
+- **Required so the deployed site shows scholarships:**  
+  `FIREBASE_SERVICE_ACCOUNT_KEY` — the full Firebase service account JSON as a single-line string. Without this, `/api/scholarships` cannot read Firestore and the app will show no scholarships.
+- **To be admin when you sign in on the deployed site:**  
+  `ADMIN_EMAILS` — set to your Google sign-in email (e.g. `you@gmail.com`). Only emails in this list see the Admin section; add multiple with commas.
 
-For **Admin** and **cron sync** (optional): `FIREBASE_SERVICE_ACCOUNT_KEY`, `ADMIN_EMAILS`, `CRON_SECRET`, `SCHOLARSHIP_API_URL`. See Admin section below.
+Optional (cron sync, etc.): `CRON_SECRET`, `SCHOLARSHIP_API_URL`, `SCHOLARSHIP_OWL_API_KEY`. See Admin and cron sections below.
+
+**Step-by-step:** See **[docs/vercel-firebase-setup.md](docs/vercel-firebase-setup.md)** for getting the service account key and configuring admin.
 
 ### 3. Firebase authorized domains
 

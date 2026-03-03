@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Space_Grotesk } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { ReactNode } from "react";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -72,6 +73,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ToastProvider>
           <ScrapeJobPoller />
           <FirebaseAnalyticsInit />
+          <SpeedInsights />
           {children}
         </ToastProvider>
       </body>
