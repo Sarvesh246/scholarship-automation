@@ -65,10 +65,12 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
             </span>
           )}
           {matchResult && matchResult.eligibilityStatus === "eligible" && (
-            <>
-              <Badge variant="success">Eligible</Badge>
-              <span className="text-emerald-400 font-medium">{matchResult.matchScore}% match</span>
-            </>
+            <Badge variant="success">Eligible</Badge>
+          )}
+          {matchResult && matchResult.eligibilityStatus === "almost_eligible" && (
+            <span title={matchResult.almostEligibleReason ?? matchResult.missingRequirements?.join(", ")}>
+              <Badge variant="info" className="cursor-help">Almost Eligible</Badge>
+            </span>
           )}
           {scholarship.featured && (
             <Badge variant="success">Featured</Badge>
@@ -111,7 +113,15 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
           ))}
         </div>
       </div>
-      <div className="flex flex-col items-end gap-2">
+      <div className="flex flex-col items-end gap-2 shrink-0">
+        {matchResult && matchResult.matchScore > 0 && (
+          <span
+            className="rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold px-2.5 py-1"
+            title="Match score from your profile"
+          >
+            {matchResult.matchScore}% match
+          </span>
+        )}
         <Button
           type="button"
           size="sm"

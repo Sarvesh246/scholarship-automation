@@ -26,7 +26,7 @@ import { getProfileCompletion, getMissingItemsForMatchUnlock } from "@/lib/profi
 import { useUser } from "@/hooks/useUser";
 import type { Scholarship, ScholarshipCategory, ScholarshipMatchResult } from "@/types";
 
-type SortOption = "soonest" | "amount" | "latest" | "lowest" | "title" | "effort_high" | "effort_low";
+type SortOption = "best_match" | "soonest" | "amount" | "latest" | "lowest" | "title" | "effort_high" | "effort_low" | "best_roi";
 type TypeFilter = "all" | "non_citizen" | "private" | "government";
 type DisplayCategoryFilter = "all" | "scholarships_only" | "sweepstakes_only";
 type DeadlineFilter = "any" | "7" | "30" | "60" | "90";
@@ -154,6 +154,20 @@ export default function ScholarshipsPage() {
     return m;
   }, [matchResults]);
 
+  const profileNudges = useMemo(() => {
+    if (!greenlightOn) return { state: 0, education: 0 };
+    let state = 0;
+    let education = 0;
+    filtered.forEach((s) => {
+      const m = matchResultsMap.get(s.id);
+      if (!m) return;
+      const missing = m.missingRequirements ?? [];
+      if (missing.some((r) => r.toLowerCase().includes("state"))) state++;
+      if (missing.some((r) => r.toLowerCase().includes("education"))) education++;
+    });
+    return { state, education };
+  }, [greenlightOn, filtered, matchResultsMap]);
+
   const greenlightFiltered = useMemo(() => {
     if (!greenlightOn) return filtered;
     const minScore = showNearMatches ? NEAR_MATCH_MIN_SCORE : GREENLIGHT_MIN_SCORE;
@@ -161,34 +175,54 @@ export default function ScholarshipsPage() {
       if (s.displayCategory === "sweepstakes") return false;
       const match = matchResultsMap.get(s.id);
       if (!match) return false;
-      if (showNearMatches)
-        return (match.eligibilityStatus === "eligible" && match.matchScore >= GREENLIGHT_MIN_SCORE) ||
-          (match.eligibilityStatus === "may_not_be_eligible" && match.matchScore >= NEAR_MATCH_MIN_SCORE);
-      return match.eligibilityStatus === "eligible" && match.matchScore >= minScore;
+      const strongEligible = (match.eligibilityStatus === "eligible" || match.eligibilityStatus === "almost_eligible") && match.matchScore >= GREENLIGHT_MIN_SCORE;
+      const nearEligible = (match.eligibilityStatus === "may_not_be_eligible" || match.eligibilityStatus === "almost_eligible") && match.matchScore >= NEAR_MATCH_MIN_SCORE && match.matchScore < GREENLIGHT_MIN_SCORE;
+      if (showNearMatches) return strongEligible || nearEligible;
+      return strongEligible;
     });
   }, [filtered, greenlightOn, showNearMatches, matchResultsMap]);
+
+  const effortMinutes = useCallback((s: Scholarship): number => {
+    const t = (s.estimatedTime ?? "").toLowerCase();
+    if (t.includes("min") && /\d+/.test(t)) return parseInt(t.match(/\d+/)?.[0] ?? "30", 10) || 30;
+    if (t.includes("hour") && /\d+/.test(t)) return (parseInt(t.match(/\d+/)?.[0] ?? "1", 10) || 1) * 60;
+    if (t.includes("4+") || t.includes("3–4") || t.includes("3-4")) return 240;
+    return 60;
+  }, []);
 
   const sorted = useMemo(() => {
     const list = greenlightOn ? [...greenlightFiltered] : [...filtered];
     const getDeadline = (s: Scholarship) => (s.deadline ? new Date(s.deadline).getTime() : 0);
     const getAmount = (s: Scholarship) => s.amount ?? 0;
     const getMatchScore = (s: Scholarship) => matchResultsMap.get(s.id)?.matchScore ?? 0;
+    const getROI = (s: Scholarship) => {
+      const amt = getAmount(s);
+      const mins = effortMinutes(s);
+      return mins > 0 ? amt / mins : 0;
+    };
     if (greenlightOn) {
       list.sort((a, b) => {
         const sa = getMatchScore(a);
         const sb = getMatchScore(b);
         if (sb !== sa) return sb - sa;
+        if (sortBy === "amount") return getAmount(b) - getAmount(a);
+        if (sortBy === "best_roi") return getROI(b) - getROI(a);
+        if (sortBy === "effort_low") return effortRank(parseEffort(a.estimatedTime || "")) - effortRank(parseEffort(b.estimatedTime || ""));
         return getDeadline(a) - getDeadline(b);
       });
-    } else if (sortBy === "soonest") list.sort((a, b) => getDeadline(a) - getDeadline(b));
-    else if (sortBy === "latest") list.sort((a, b) => getDeadline(b) - getDeadline(a));
-    else if (sortBy === "amount") list.sort((a, b) => getAmount(b) - getAmount(a));
-    else if (sortBy === "lowest") list.sort((a, b) => getAmount(a) - getAmount(b));
-    else if (sortBy === "title") list.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-    else if (sortBy === "effort_high") list.sort((a, b) => effortRank(parseEffort(b.estimatedTime || "")) - effortRank(parseEffort(a.estimatedTime || "")));
-    else if (sortBy === "effort_low") list.sort((a, b) => effortRank(parseEffort(a.estimatedTime || "")) - effortRank(parseEffort(b.estimatedTime || "")));
+    } else {
+      if (sortBy === "best_match") list.sort((a, b) => getMatchScore(b) - getMatchScore(a) || getDeadline(a) - getDeadline(b));
+      else if (sortBy === "soonest") list.sort((a, b) => getDeadline(a) - getDeadline(b));
+      else if (sortBy === "latest") list.sort((a, b) => getDeadline(b) - getDeadline(a));
+      else if (sortBy === "amount") list.sort((a, b) => getAmount(b) - getAmount(a));
+      else if (sortBy === "lowest") list.sort((a, b) => getAmount(a) - getAmount(b));
+      else if (sortBy === "title") list.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+      else if (sortBy === "effort_high") list.sort((a, b) => effortRank(parseEffort(b.estimatedTime || "")) - effortRank(parseEffort(a.estimatedTime || "")));
+      else if (sortBy === "effort_low") list.sort((a, b) => effortRank(parseEffort(a.estimatedTime || "")) - effortRank(parseEffort(b.estimatedTime || "")));
+      else if (sortBy === "best_roi") list.sort((a, b) => getROI(b) - getROI(a));
+    }
     return list;
-  }, [greenlightFiltered, filtered, greenlightOn, sortBy, matchResultsMap]);
+  }, [greenlightFiltered, filtered, greenlightOn, sortBy, matchResultsMap, effortMinutes]);
 
   const featured = useMemo(() => sorted.filter((s) => s.featured), [sorted]);
   const nonFeatured = useMemo(() => sorted.filter((s) => !s.featured), [sorted]);
@@ -278,7 +312,29 @@ export default function ScholarshipsPage() {
 
       {greenlightOn && (
         <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-          <strong>Greenlight Mode:</strong> Only scholarships you&apos;re eligible for. Based on your profile.
+          <strong>Greenlight Mode:</strong> {greenlightFiltered.length} scholarship{greenlightFiltered.length === 1 ? "" : "s"} you qualify for.
+        </div>
+      )}
+      {greenlightOn && filtered.length > 0 && (
+        <p className="text-xs text-[var(--muted-2)]">
+          Based on your profile, we filtered {filtered.length} scholarship{filtered.length === 1 ? "" : "s"} down to {greenlightFiltered.length} high-confidence match{greenlightFiltered.length === 1 ? "" : "es"}.
+        </p>
+      )}
+      {greenlightOn && (profileNudges.state > 0 || profileNudges.education > 0) && (
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          {profileNudges.state > 0 && (
+            <Link href="/app/profile" className="text-emerald-500 hover:underline">
+              Add your state to unlock up to {profileNudges.state} more match{profileNudges.state === 1 ? "" : "es"}
+            </Link>
+          )}
+          {profileNudges.education > 0 && (
+            <Link href="/app/profile" className="text-emerald-500 hover:underline">
+              Add education level to unlock up to {profileNudges.education} more match{profileNudges.education === 1 ? "" : "es"}
+            </Link>
+          )}
+          <Link href="/app/profile" className="text-[var(--muted-2)] hover:text-[var(--text)]">
+            Add intended major to refine results
+          </Link>
         </div>
       )}
 
@@ -335,17 +391,19 @@ export default function ScholarshipsPage() {
           />
         </div>
         <Select
-          className="w-44"
+          className="w-48"
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortOption)}
         >
-          <option value="soonest">Sort: Soonest deadline</option>
-          <option value="latest">Sort: Latest deadline</option>
-          <option value="amount">Sort: Highest amount</option>
-          <option value="lowest">Sort: Lowest amount</option>
-          <option value="effort_high">Sort: Highest effort</option>
-          <option value="effort_low">Sort: Lowest effort</option>
-          <option value="title">Sort: Title A–Z</option>
+          <option value="best_match">Best match</option>
+          <option value="soonest">Soonest deadline</option>
+          <option value="amount">Highest award</option>
+          <option value="best_roi">Best ROI</option>
+          <option value="effort_low">Lowest effort</option>
+          <option value="latest">Latest deadline</option>
+          <option value="lowest">Lowest amount</option>
+          <option value="effort_high">Highest effort</option>
+          <option value="title">Title A–Z</option>
         </Select>
         <Select
           className="w-32"

@@ -2,13 +2,19 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { PipelineBoard } from "@/components/feature/PipelineBoard";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { getApplications } from "@/lib/applicationStorage";
+import { getApplications, ensureApplication } from "@/lib/applicationStorage";
 import { getScholarships } from "@/lib/scholarshipStorage";
+import { getProfile } from "@/lib/profileStorage";
+import { computeMatchesForUser, getCachedMatches, invalidateMatchCache, GREENLIGHT_MIN_SCORE } from "@/lib/matchEngine";
+import { useUser } from "@/hooks/useUser";
+import { decodeHtmlEntities } from "@/lib/utils";
 import type { Application, Scholarship } from "@/types";
 
 function getDeadlinesForNextDays<T extends { deadline: string }>(
@@ -25,8 +31,11 @@ function getDeadlinesForNextDays<T extends { deadline: string }>(
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { user } = useUser();
   const [applications, setApplications] = useState<Application[]>([]);
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
+  const [matchResults, setMatchResults] = useState<{ id: string; matchScore: number; eligibilityStatus: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -45,6 +54,21 @@ export default function DashboardPage() {
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [loadData]);
+
+  useEffect(() => {
+    if (!user?.uid || scholarships.length === 0) return;
+    const run = async () => {
+      const profile = await getProfile();
+      const cached = getCachedMatches(user.uid);
+      if (cached && cached.length === scholarships.length) {
+        setMatchResults(cached.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus })));
+        return;
+      }
+      const results = await computeMatchesForUser(user.uid, profile, scholarships);
+      setMatchResults(results.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus })));
+    };
+    run();
+  }, [user?.uid, scholarships]);
 
   type DeadlineStatus = "not_started" | "in_progress" | "submitted";
   type AppDeadline = { id: string; title: string; scholarshipId: string; deadline: string; status: DeadlineStatus };
@@ -93,7 +117,28 @@ export default function DashboardPage() {
     [applications, scholarships]
   );
 
-  const matchedCount = applications.length;
+  const applicationIds = useMemo(() => new Set(applications.map((a) => a.scholarshipId)), [applications]);
+  const greenlightEligibleCount = useMemo(() => {
+    return matchResults.filter(
+      (r) =>
+        (r.eligibilityStatus === "eligible" || r.eligibilityStatus === "almost_eligible" || r.eligibilityStatus === "may_not_be_eligible") &&
+        r.matchScore >= GREENLIGHT_MIN_SCORE
+    ).length;
+  }, [matchResults]);
+  const topRecommended = useMemo(() => {
+    const notStarted = scholarships.filter((s) => !applicationIds.has(s.id));
+    const withScores = notStarted
+      .map((s) => {
+        const r = matchResults.find((m) => m.id === s.id);
+        if (!r) return null;
+        const ok = r.eligibilityStatus === "eligible" || r.eligibilityStatus === "almost_eligible" || (r.eligibilityStatus === "may_not_be_eligible" && r.matchScore >= 50);
+        if (!ok) return null;
+        return { scholarship: s, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+    withScores.sort((a, b) => b.matchScore - a.matchScore || (new Date(a.scholarship.deadline || "").getTime() - new Date(b.scholarship.deadline || "").getTime()));
+    return withScores.slice(0, 3);
+  }, [scholarships, applicationIds, matchResults]);
 
   const pipelineCards = useMemo(
     () =>
@@ -115,8 +160,18 @@ export default function DashboardPage() {
 
   const statCards = [
     {
-      label: "Matched scholarships",
-      value: matchedCount,
+      label: "Scholarships you qualify for",
+      value: greenlightEligibleCount,
+      icon: (
+        <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      iconBg: "bg-emerald-500/10"
+    },
+    {
+      label: "In your pipeline",
+      value: applications.length,
       icon: (
         <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -185,7 +240,7 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-5">
         {statCards.map((stat) => (
           <Card key={stat.label} className="p-4">
             <div className="flex items-center gap-3">
@@ -200,6 +255,50 @@ export default function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {topRecommended.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-medium text-[var(--muted)]">
+            Top recommended for you
+          </h2>
+          <p className="text-xs text-[var(--muted-2)]">
+            {greenlightEligibleCount} scholarship{greenlightEligibleCount === 1 ? "" : "s"} you qualify for. Start with these:
+          </p>
+          <div className="grid gap-4 md:grid-cols-3">
+            {topRecommended.map(({ scholarship, matchScore }) => (
+              <Card key={scholarship.id} className="p-4 flex flex-col">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-medium text-[var(--text)] line-clamp-2">
+                    {decodeHtmlEntities(scholarship.title)}
+                  </h3>
+                  <span className="shrink-0 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold px-2 py-0.5">
+                    {matchScore}% match
+                  </span>
+                </div>
+                {scholarship.deadline && (
+                  <p className="mt-1 text-xs text-[var(--muted-2)]">
+                    Due {new Date(scholarship.deadline).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                  </p>
+                )}
+                {scholarship.amount != null && scholarship.amount > 0 && (
+                  <p className="mt-0.5 text-xs text-[var(--muted-2)]">
+                    Award: ${scholarship.amount.toLocaleString()}
+                  </p>
+                )}
+                <Button
+                  className="mt-3 w-full btn-gold text-sm py-2"
+                  onClick={async () => {
+                    const app = await ensureApplication(scholarship.id);
+                    router.push(`/app/applications/${app.id}`);
+                  }}
+                >
+                  Start
+                </Button>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-[var(--muted)]">

@@ -201,9 +201,13 @@ export interface UserSignals {
 /** Result of matching one scholarship to the user. */
 export interface ScholarshipMatchResult {
   scholarshipId: string;
-  eligibilityStatus: "eligible" | "may_not_be_eligible" | "ineligible" | "unknown";
+  eligibilityStatus: "eligible" | "may_not_be_eligible" | "almost_eligible" | "ineligible" | "unknown";
   matchScore: number;
   reasons: string[];
   missingRequirements: string[];
+  /** Criteria that failed (for Layer 1 / tooltips). */
+  failedCriteria?: string[];
+  /** Human-readable reason for "Almost Eligible" e.g. "Requires 3.5 GPA (you have 3.4)". */
+  almostEligibleReason?: string;
 }
 

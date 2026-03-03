@@ -51,6 +51,13 @@ export async function GET(request: Request) {
     const byDeadline: { next7: number; next30: number; next90: number; later: number } = { next7: 0, next30: 0, next90: 0, later: 0 };
     const now = new Date();
 
+    let matchableCount = 0;
+    let missingEligibilityCount = 0;
+    let missingGPACount = 0;
+    let missingStateCount = 0;
+    let qualitySum = 0;
+    let qualityCount = 0;
+
     for (const s of nonJunk) {
       const src = inferSource(String(s.id), s.source as string | undefined);
       bySource[src] = (bySource[src] ?? 0) + 1;
@@ -66,7 +73,30 @@ export async function GET(request: Request) {
         else if (days <= 90) byDeadline.next90++;
         else byDeadline.later++;
       }
+      const norm = s.normalized as { matchable?: boolean; educationLevelsEligible?: string[]; statesEligible?: string[]; majorsEligible?: string[]; minGPA?: number | null; qualityScore?: number } | undefined;
+      if (norm?.matchable) matchableCount++;
+      const hasEligibility = (norm?.educationLevelsEligible?.length ?? 0) > 0 || (norm?.statesEligible?.length ?? 0) > 0 || (norm?.majorsEligible?.length ?? 0) > 0;
+      if (!hasEligibility) missingEligibilityCount++;
+      if (norm && "minGPA" in norm && (norm.minGPA == null || norm.minGPA === undefined)) missingGPACount++;
+      const hasState = (norm?.statesEligible?.length ?? 0) > 0;
+      if (!hasState) missingStateCount++;
+      const q = (s.qualityScore as number) ?? norm?.qualityScore;
+      if (typeof q === "number") {
+        qualitySum += q;
+        qualityCount++;
+      }
     }
+
+    const totalForMatch = nonJunk.length || 1;
+    const matchingHealth = {
+      matchablePercent: Math.round((matchableCount / totalForMatch) * 100),
+      missingStructuredEligibilityPercent: Math.round((missingEligibilityCount / totalForMatch) * 100),
+      missingGPAPercent: Math.round((missingGPACount / totalForMatch) * 100),
+      missingStateEligibilityPercent: Math.round((missingStateCount / totalForMatch) * 100),
+      averageQualityScore: qualityCount > 0 ? Math.round((qualitySum / qualityCount) * 10) / 10 : null,
+      matchableCount,
+      totalScholarships: totalForMatch,
+    };
 
     const syncHistory = syncHistorySnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const errors = errorsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -90,6 +120,7 @@ export async function GET(request: Request) {
       totalUsers: usersSnap.data().count,
       applicationsCount: applicationsSnap.data().count,
       essaysCount: essaysSnap.data().count,
+      matchingHealth,
       syncHistory,
       errors,
       envVars,

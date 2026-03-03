@@ -70,40 +70,59 @@ export function buildUserSignals(profile: Profile): UserSignals {
   };
 }
 
-/** Hard eligibility gate: deadline, education level, location, min GPA, major if required. */
+/** Hard eligibility gate. When user is missing a field (state, education), we don't fail—we pass and nudge. Only fail when they HAVE data and it doesn't match. */
 function hardGate(
   norm: NormalizedScholarship,
   signals: UserSignals
-): { pass: boolean; missingRequirements: string[] } {
+): { pass: boolean; missingRequirements: string[]; failedCriteria: string[]; almostEligibleReason?: string } {
   const missing: string[] = [];
+  const failedCriteria: string[] = [];
   if (norm.deadline < today()) {
     missing.push("Deadline passed");
-    return { pass: false, missingRequirements: missing };
+    failedCriteria.push("Deadline passed");
+    return { pass: false, missingRequirements: missing, failedCriteria };
   }
   if (norm.educationLevelsEligible.length > 0 && !norm.educationLevelsEligible.includes("*")) {
     const userLevel = signals.educationLevel ?? (signals.graduationYear ? "college" : undefined);
-    if (!userLevel) missing.push("Education level");
-    else if (!norm.educationLevelsEligible.includes(userLevel)) {
+    if (!userLevel) {
+      missing.push("Add education level to confirm eligibility");
+    } else if (!norm.educationLevelsEligible.includes(userLevel)) {
       missing.push("Education level");
-      return { pass: false, missingRequirements: missing };
+      failedCriteria.push("Education level");
+      return { pass: false, missingRequirements: missing, failedCriteria };
     }
   }
   if (norm.statesEligible.length > 0 && !norm.statesEligible.includes("*")) {
-    const userState = (signals.state ?? "").toUpperCase().slice(0, 2);
-    if (!userState) missing.push("State");
-    else if (!norm.statesEligible.some((s) => s === userState)) {
+    const userState = (signals.state ?? "").trim().toUpperCase().slice(0, 2);
+    if (!userState) {
+      missing.push("Add your state to confirm eligibility");
+    } else if (!norm.statesEligible.some((s) => s === userState)) {
       missing.push("State eligibility");
-      return { pass: false, missingRequirements: missing };
+      failedCriteria.push("State eligibility");
+      return { pass: false, missingRequirements: missing, failedCriteria };
     }
   }
   if (norm.minGPA != null && signals.gpa != null) {
     const maxGpa = signals.gpaScale === "5.0" ? 5 : 4;
-    if (signals.gpa < norm.minGPA || signals.gpa > maxGpa) {
+    if (signals.gpa > maxGpa) {
       missing.push("GPA");
-      return { pass: false, missingRequirements: missing };
+      failedCriteria.push("GPA");
+      return { pass: false, missingRequirements: missing, failedCriteria };
+    }
+    if (signals.gpa < norm.minGPA) {
+      const gap = norm.minGPA - signals.gpa;
+      if (gap <= 0.2) {
+        const reason = `Requires ${norm.minGPA} GPA (you have ${signals.gpa})`;
+        missing.push(reason);
+        failedCriteria.push("GPA");
+        return { pass: false, missingRequirements: missing, failedCriteria, almostEligibleReason: reason };
+      }
+      missing.push(`Requires ${norm.minGPA} minimum GPA`);
+      failedCriteria.push("GPA");
+      return { pass: false, missingRequirements: missing, failedCriteria };
     }
   }
-  return { pass: true, missingRequirements: missing };
+  return { pass: true, missingRequirements: missing, failedCriteria: [] };
 }
 
 /** Score 0–100: major/field, location, grade/edu, tag overlap, requirements fit, quality bonus. */
@@ -164,21 +183,42 @@ function scoreMatch(
   return { score: Math.min(100, score), reasons: [...new Set(reasons)].slice(0, 6) };
 }
 
-/** Compute match result for one scholarship. */
+/** Build a minimal normalized-like shape from raw scholarship when normalized is missing, so we can still score and show something. */
+function fallbackNormalized(s: Scholarship): NormalizedScholarship | null {
+  const deadline = (s.deadline ?? "").replace(/T.*$/, "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline) || deadline < today()) return null;
+  const amount = typeof s.amount === "number" && s.amount >= 0 ? s.amount : 0;
+  return {
+    title: (s.title ?? "").trim(),
+    orgName: (s.sponsor ?? "").trim(),
+    orgWebsite: s.applicationUrl ?? null,
+    applyUrl: s.applicationUrl ?? null,
+    deadline,
+    awardMin: amount,
+    awardMax: amount,
+    frequency: "one-time",
+    statesEligible: ["*"],
+    educationLevelsEligible: ["high_school", "college"],
+    gradeLevelsEligible: [],
+    majorsEligible: ["*"],
+    fieldsEligible: (s.categoryTags ?? []).length ? s.categoryTags!.map((c) => String(c).toLowerCase()) : ["*"],
+    minGPA: null,
+    tags: [...(s.categoryTags ?? []).map((c) => String(c).toLowerCase()), ...(s.eligibilityTags ?? []).slice(0, 5)],
+    requirements: (s.prompts ?? []).length > 0 ? ["essay"] : [],
+    needBased: null,
+    verifiedStatus: s.verificationStatus === "approved" ? "approved" : "needs_review",
+    qualityScore: s.qualityScore ?? 50,
+    lastVerifiedAt: null,
+    source: s.source ?? "manual",
+    matchable: true,
+  };
+}
+
+/** Compute match result for one scholarship. Uses fallback normalized when missing so scholarships still show. */
 export function computeMatch(
   scholarship: Scholarship,
   signals: UserSignals
 ): ScholarshipMatchResult {
-  const norm = scholarship.normalized;
-  if (!norm || !norm.matchable) {
-    return {
-      scholarshipId: scholarship.id,
-      eligibilityStatus: "unknown",
-      matchScore: 0,
-      reasons: [],
-      missingRequirements: ["Eligibility unknown"],
-    };
-  }
   if (scholarship.verificationStatus === "flagged" || scholarship.verificationStatus === "hidden") {
     return {
       scholarshipId: scholarship.id,
@@ -186,17 +226,39 @@ export function computeMatch(
       matchScore: 0,
       reasons: [],
       missingRequirements: ["Not shown"],
+      failedCriteria: [],
+    };
+  }
+  const norm = scholarship.normalized ?? fallbackNormalized(scholarship);
+  if (!norm) {
+    return {
+      scholarshipId: scholarship.id,
+      eligibilityStatus: "unknown",
+      matchScore: 0,
+      reasons: [],
+      missingRequirements: ["Deadline passed or invalid"],
+      failedCriteria: [],
     };
   }
   const gate = hardGate(norm, signals);
-  const { score, reasons } = scoreMatch(norm, scholarship, signals, gate.pass);
-  const eligibilityStatus = gate.pass ? (score >= GREENLIGHT_MIN_SCORE ? "eligible" : "may_not_be_eligible") : "ineligible";
+  const scoreForRanking = gate.pass || !!gate.almostEligibleReason;
+  const { score, reasons } = scoreMatch(norm, scholarship, signals, scoreForRanking);
+  let eligibilityStatus: ScholarshipMatchResult["eligibilityStatus"];
+  if (gate.almostEligibleReason) {
+    eligibilityStatus = "almost_eligible";
+  } else if (gate.pass) {
+    eligibilityStatus = score >= GREENLIGHT_MIN_SCORE ? "eligible" : "may_not_be_eligible";
+  } else {
+    eligibilityStatus = "ineligible";
+  }
   return {
     scholarshipId: scholarship.id,
     eligibilityStatus,
     matchScore: score,
     reasons,
     missingRequirements: gate.missingRequirements,
+    failedCriteria: gate.failedCriteria,
+    almostEligibleReason: gate.almostEligibleReason,
   };
 }
 

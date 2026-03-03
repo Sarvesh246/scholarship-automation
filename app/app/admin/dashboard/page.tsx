@@ -8,6 +8,16 @@ import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAdmin, getIdToken } from "@/hooks/useAdmin";
 
+interface MatchingHealth {
+  matchablePercent: number;
+  missingStructuredEligibilityPercent: number;
+  missingGPAPercent: number;
+  missingStateEligibilityPercent: number;
+  averageQualityScore: number | null;
+  matchableCount: number;
+  totalScholarships: number;
+}
+
 interface Stats {
   totalScholarships: number;
   expiredCount: number;
@@ -18,6 +28,7 @@ interface Stats {
   applicationsCount: number;
   essaysCount: number;
   totalUsers?: number;
+  matchingHealth?: MatchingHealth;
   syncHistory: { source: string; created: number; updated: number; at?: { _seconds?: number }; errors?: string[] }[];
   errors: { source: string; message: string; at?: { _seconds?: number } }[];
   envVars: { key: string; set: boolean }[];
@@ -118,6 +129,39 @@ export default function AdminDashboardPage() {
           <p className="mt-1 text-2xl font-bold">{stats.byDeadline.next7}</p>
         </Card>
       </div>
+
+      {stats.matchingHealth && (
+        <Card className="p-4 border-emerald-500/20">
+          <h3 className="text-sm font-semibold text-[var(--text)]">Matching health</h3>
+          <p className="text-xs text-[var(--muted-2)] mt-0.5">Quality of normalized data for Greenlight matching. Run full validation to improve.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div>
+              <p className="text-[10px] text-[var(--muted-2)]">% matchable</p>
+              <p className="text-lg font-bold text-emerald-400">{stats.matchingHealth.matchablePercent}%</p>
+              <p className="text-[10px] text-[var(--muted-2)]">{stats.matchingHealth.matchableCount} / {stats.matchingHealth.totalScholarships}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-[var(--muted-2)]">% missing eligibility</p>
+              <p className="text-lg font-bold">{stats.matchingHealth.missingStructuredEligibilityPercent}%</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-[var(--muted-2)]">% missing GPA data</p>
+              <p className="text-lg font-bold">{stats.matchingHealth.missingGPAPercent}%</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-[var(--muted-2)]">% missing state eligibility</p>
+              <p className="text-lg font-bold">{stats.matchingHealth.missingStateEligibilityPercent}%</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-[var(--muted-2)]">Avg quality score</p>
+              <p className="text-lg font-bold">{stats.matchingHealth.averageQualityScore ?? "—"}</p>
+            </div>
+          </div>
+          <Link href="/app/admin/sync#validation" className="inline-block mt-3">
+            <Button type="button" variant="secondary" size="sm">Run full validation</Button>
+          </Link>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="p-4">
