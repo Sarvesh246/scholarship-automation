@@ -102,7 +102,18 @@ export async function GET(request: NextRequest) {
     setCachedList(cacheKey, result);
     return NextResponse.json(result);
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error("[GET /api/scholarships]", err);
-    return NextResponse.json({ error: "Failed to fetch scholarships" }, { status: 500 });
+    const isConfig = /FIREBASE_SERVICE_ACCOUNT|FIREBASE_PRIVATE_KEY|FIREBASE_PROJECT_ID|Missing|credential|JSON\.parse/i.test(message);
+    return NextResponse.json(
+      {
+        error: "Failed to fetch scholarships",
+        ...(isConfig && {
+          hint: "Check Firebase env: FIREBASE_SERVICE_ACCOUNT_KEY (full JSON) or FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY",
+          detail: message,
+        }),
+      },
+      { status: 500 }
+    );
   }
 }

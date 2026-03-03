@@ -1,21 +1,43 @@
 /**
  * Firebase Admin SDK for API routes (server-only).
- * Requires FIREBASE_SERVICE_ACCOUNT_KEY env var (full JSON key as string) in production.
- * For local dev, can use GOOGLE_APPLICATION_CREDENTIALS pointing to scripts/serviceAccountKey.json.
- *
- * To use the Firestore Emulator (no prod quota): set FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
- * before starting the dev server. Start the emulator with: firebase emulators:start --only firestore
+ * Supports either:
+ * - FIREBASE_SERVICE_ACCOUNT_KEY: full JSON key as string, or
+ * - Separate vars: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
+ *   (FIREBASE_PRIVATE_KEY can use escaped newlines \\n in env; we replace to real newlines.)
+ * For local dev, can use scripts/serviceAccountKey.json when no env key is set.
  */
 
 import { initializeApp, getApps, cert, type ServiceAccount } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
+/** Unescape \\n in private key string (for env vars that store the key with literal \n). */
+function unescapePrivateKey(key: string | undefined): string | undefined {
+  if (!key) return undefined;
+  return key.replace(/\\n/g, "\n");
+}
+
 function getServiceAccount(): ServiceAccount | undefined {
+  // Prefer separate env vars (common on Vercel: paste private_key with \n as \\n)
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = unescapePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+  if (projectId && clientEmail && privateKey) {
+    return {
+      projectId,
+      clientEmail,
+      privateKey,
+    } as ServiceAccount;
+  }
+
   const key = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (key) {
     try {
-      return JSON.parse(key) as ServiceAccount;
+      const parsed = JSON.parse(key) as ServiceAccount;
+      if (typeof parsed.private_key === "string") {
+        parsed.private_key = unescapePrivateKey(parsed.private_key) ?? parsed.private_key;
+      }
+      return parsed;
     } catch {
       return undefined;
     }
@@ -26,7 +48,11 @@ function getServiceAccount(): ServiceAccount | undefined {
     const fs = require("fs");
     const p = path.join(process.cwd(), "scripts", "serviceAccountKey.json");
     if (fs.existsSync(p)) {
-      return JSON.parse(fs.readFileSync(p, "utf-8")) as ServiceAccount;
+      const parsed = JSON.parse(fs.readFileSync(p, "utf-8")) as ServiceAccount;
+      if (typeof parsed.private_key === "string") {
+        parsed.private_key = unescapePrivateKey(parsed.private_key) ?? parsed.private_key;
+      }
+      return parsed;
     }
   } catch {
     // ignore
@@ -41,7 +67,7 @@ function getAdminApp() {
   const cred = getServiceAccount();
   if (!cred) {
     throw new Error(
-      "Missing FIREBASE_SERVICE_ACCOUNT_KEY. Set it to the full JSON service account key string (e.g. in Vercel env)."
+      "Missing Firebase credentials. Set FIREBASE_SERVICE_ACCOUNT_KEY (full JSON) or FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY in Vercel env."
     );
   }
   return initializeApp({ credential: cert(cred) });
