@@ -30,9 +30,9 @@ export default function SignInPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await signInWithEmail(email, password);
+      await signInWithEmail(email.trim(), password);
       setAuthCookie();
-      router.push(redirectTo);
+      router.replace(redirectTo);
       showToast({ title: "Welcome back", variant: "success" });
     } catch (err: unknown) {
       const obj = err && typeof err === "object" ? (err as Record<string, unknown>) : {};
@@ -57,7 +57,7 @@ export default function SignInPage() {
     try {
       await signInWithGoogle();
       setAuthCookie();
-      router.push(redirectTo);
+      router.replace(redirectTo);
       showToast({ title: "Signed in with Google", variant: "success" });
     } catch (err: unknown) {
       // Firebase Auth errors: { code: "auth/...", message: "..." }; sometimes wrapped

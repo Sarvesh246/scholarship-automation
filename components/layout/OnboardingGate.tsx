@@ -23,6 +23,11 @@ export function OnboardingGate({ children }: OnboardingGateProps) {
       pathnameFetchedRef.current = null;
       return;
     }
+    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem("onboarding_just_complete") === "1") {
+      sessionStorage.removeItem("onboarding_just_complete");
+      pathnameFetchedRef.current = pathname;
+      return;
+    }
     getProfile().then((profile: Profile | null) => {
       if (!profile) return;
       pathnameFetchedRef.current = pathname;

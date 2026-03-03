@@ -11,6 +11,8 @@ import { getProfile, saveProfile } from "@/lib/profileStorage";
 import { updateUserDisplayName } from "@/lib/auth";
 import type { Profile } from "@/types";
 
+const ONBOARDING_JUST_COMPLETE_KEY = "onboarding_just_complete";
+
 export default function OnboardingPage() {
   const router = useRouter();
   const { showToast } = useToast();
@@ -20,6 +22,7 @@ export default function OnboardingPage() {
   const [gradYear, setGradYear] = useState("");
   const [gpa, setGpa] = useState("");
   const [saving, setSaving] = useState(false);
+  const [skipping, setSkipping] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,13 +51,16 @@ export default function OnboardingPage() {
           ...(state.trim() && { state: state.trim() }),
           ...(school.trim() && { school: school.trim() }),
         },
+        schoolName: school.trim() || existing.schoolName,
         onboardingComplete: true,
       };
       await saveProfile(profile);
+      if (typeof sessionStorage !== "undefined") sessionStorage.setItem(ONBOARDING_JUST_COMPLETE_KEY, "1");
       showToast({ title: "Welcome! Set up complete.", variant: "success" });
       router.replace("/app/dashboard");
-    } catch {
-      showToast({ title: "Something went wrong. Try again.", variant: "danger" });
+    } catch (err) {
+      const message = err instanceof Error && err.message.includes("sign in") ? "Session expired. Please sign in again." : "Something went wrong. Try again.";
+      showToast({ title: message, variant: "danger" });
     } finally {
       setSaving(false);
     }
@@ -106,13 +112,22 @@ export default function OnboardingPage() {
             <Button
               type="button"
               variant="secondary"
+              disabled={saving || skipping}
               onClick={async () => {
-                const p = await getProfile();
-                await saveProfile({ ...p, onboardingComplete: true });
-                router.replace("/app/dashboard");
+                setSkipping(true);
+                try {
+                  const p = await getProfile();
+                  await saveProfile({ ...p, onboardingComplete: true });
+                  if (typeof sessionStorage !== "undefined") sessionStorage.setItem(ONBOARDING_JUST_COMPLETE_KEY, "1");
+                  router.replace("/app/dashboard");
+                } catch {
+                  showToast({ title: "Could not skip. Try again.", variant: "danger" });
+                } finally {
+                  setSkipping(false);
+                }
               }}
             >
-              Skip for now
+              {skipping ? "Skipping…" : "Skip for now"}
             </Button>
           </div>
         </form>

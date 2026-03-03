@@ -141,8 +141,10 @@ export interface Profile {
     gpa?: string;
     major?: string;
     graduationYear?: string;
-    /** GPA scale for filters: "4.0" | "5.0" */
-    gpaScale?: "4.0" | "5.0";
+    /** GPA scale for matching: "4.0" | "5.0" | "custom". When "custom", gpaScaleCustom is the scale max (e.g. 6, 10, 100). */
+    gpaScale?: "4.0" | "5.0" | "custom";
+    /** When gpaScale is "custom", the maximum value of the user's scale (e.g. 6 for 0–6 scale). Used to convert to 4.0 for matching. */
+    gpaScaleCustom?: number;
   };
   activities: { id: string; name: string; role: string; type?: string; tags?: string[] }[];
   awards: { id: string; name: string; year: string; category?: string; tags?: string[] }[];

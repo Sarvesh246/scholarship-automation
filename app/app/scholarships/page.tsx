@@ -167,17 +167,15 @@ export default function ScholarshipsPage() {
   }, [matchResults]);
 
   const profileNudges = useMemo(() => {
-    if (!greenlightOn) return { state: 0, education: 0 };
+    if (!greenlightOn) return { state: 0 };
     let state = 0;
-    let education = 0;
     filtered.forEach((s) => {
       const m = matchResultsMap.get(s.id);
       if (!m) return;
       const missing = m.missingRequirements ?? [];
       if (missing.some((r) => r.toLowerCase().includes("state"))) state++;
-      if (missing.some((r) => r.toLowerCase().includes("education"))) education++;
     });
-    return { state, education };
+    return { state };
   }, [greenlightOn, filtered, matchResultsMap]);
 
   const greenlightFiltered = useMemo(() => {
@@ -286,7 +284,7 @@ export default function ScholarshipsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Scholarships"
-        subtitle="Browse scholarships you haven't started yet. Started applications appear in Applications."
+        subtitle={greenlightOn ? "Scholarships you qualify for." : "Explore scholarships across the country."}
         primaryAction={
           <Button
             type="button"
@@ -304,44 +302,34 @@ export default function ScholarshipsPage() {
         <button
           type="button"
           onClick={() => setGreenlightOn((v) => !v)}
-          className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-all ${
+          className={`inline-flex items-center gap-2 rounded-full text-sm font-semibold transition-all ${
             greenlightOn
-              ? "bg-emerald-500/25 text-emerald-400 border-2 border-emerald-500/50 shadow-lg shadow-emerald-500/10"
-              : "bg-[var(--surface)] text-[var(--muted)] border-2 border-[var(--border)] hover:border-emerald-500/30 hover:text-[var(--text)]"
+              ? "px-5 py-3 bg-emerald-500/25 text-emerald-400 border-2 border-emerald-500/50 shadow-lg shadow-emerald-500/15 ring-2 ring-emerald-400/20 animate-pulse"
+              : "px-4 py-2.5 bg-[var(--surface)] text-[var(--muted)] border-2 border-[var(--border)] hover:border-emerald-500/30 hover:text-[var(--text)]"
           }`}
         >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
-          Greenlight
+          Greenlight{greenlightOn && greenlightFiltered.length >= 0 ? ` (${greenlightFiltered.length})` : ""}
         </button>
         {greenlightOn && (
           <p className="text-xs text-[var(--muted)]">
-            Only scholarships you&apos;re eligible for, based on your profile.
+            Showing {greenlightFiltered.length} scholarship{greenlightFiltered.length === 1 ? "" : "s"} you&apos;re eligible for.
           </p>
         )}
       </div>
 
-      {greenlightOn && (
-        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-          <strong>Greenlight Mode:</strong> {greenlightFiltered.length} scholarship{greenlightFiltered.length === 1 ? "" : "s"} you qualify for.
-        </div>
-      )}
       {greenlightOn && filtered.length > 0 && (
         <p className="text-xs text-[var(--muted-2)]">
           Based on your profile, we filtered {filtered.length} scholarship{filtered.length === 1 ? "" : "s"} down to {greenlightFiltered.length} high-confidence match{greenlightFiltered.length === 1 ? "" : "es"}.
         </p>
       )}
-      {greenlightOn && (profileNudges.state > 0 || profileNudges.education > 0) && (
+      {greenlightOn && profileNudges.state > 0 && (
         <div className="flex flex-wrap items-center gap-3 text-xs">
           {profileNudges.state > 0 && (
             <Link href="/app/profile" className="text-emerald-500 hover:underline">
               Add your state to unlock up to {profileNudges.state} more match{profileNudges.state === 1 ? "" : "es"}
-            </Link>
-          )}
-          {profileNudges.education > 0 && (
-            <Link href="/app/profile" className="text-emerald-500 hover:underline">
-              Add education level to unlock up to {profileNudges.education} more match{profileNudges.education === 1 ? "" : "es"}
             </Link>
           )}
           <Link href="/app/profile" className="text-[var(--muted-2)] hover:text-[var(--text)]">
@@ -472,15 +460,16 @@ export default function ScholarshipsPage() {
         </p>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {displayList.length === 0 ? (
           greenlightOn ? (
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
-              <p className="text-sm font-medium text-[var(--text)]">No Greenlight matches yet</p>
-              <p className="mt-1 text-xs text-[var(--muted)]">
+              <p className="text-base font-semibold text-[var(--text)]">No Greenlight matches yet</p>
+              <p className="mt-2 text-sm text-[var(--muted)]">
                 Add profile details to unlock matches, or browse all scholarships.
               </p>
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+              <p className="mt-1 text-xs text-[var(--muted-2)]">Based on your profile we couldn&apos;t find 70%+ matches yet. Add your state, education level, or major to see more.</p>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                 {!showNearMatches ? (
                   <Button
                     type="button"
@@ -516,9 +505,13 @@ export default function ScholarshipsPage() {
               </div>
             </div>
           ) : (
-            <p className="py-8 text-center text-sm text-[var(--muted)]">
-              No scholarships found. Try a different search or filters.
-            </p>
+            <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-8 text-center">
+              <p className="text-base font-semibold text-[var(--text)]">No scholarships match your filters</p>
+              <p className="mt-1 text-sm text-[var(--muted)]">Try a different search or clear filters. Or turn on Greenlight to see ones you qualify for.</p>
+              <Button type="button" variant="secondary" size="sm" className="mt-4" onClick={() => setGreenlightOn(true)}>
+                Turn on Greenlight
+              </Button>
+            </div>
           )
         ) : (
           paginated.map((scholarship) => (

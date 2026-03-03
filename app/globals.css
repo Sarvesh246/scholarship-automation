@@ -201,8 +201,8 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ─── Hero ───────────────────────────────────────────────────────── */
 .hero-title {
-  font-size: clamp(2.5rem, 6vw, 4.5rem);
-  line-height: 1.1;
+  font-size: clamp(2rem, 5vw, 4rem);
+  line-height: 1.12;
   letter-spacing: -0.02em;
 }
 
@@ -216,7 +216,7 @@ h1, h2, h3, h4, h5, h6 {
 /* ─── Stat Counter ───────────────────────────────────────────────── */
 .stat-number {
   font-family: var(--font-heading), system-ui, sans-serif;
-  font-size: 2.5rem;
+  font-size: 2rem;
   font-weight: 700;
   color: var(--primary-light);
 }
@@ -438,10 +438,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ─── Reveal Animations ──────────────────────────────────────────── */
+/* Slight initial opacity (0.94) so content is never fully blank in Firefox.
+   Original dynamic delays per section (hero 0.2s right, steps i*0.1s, etc.) drive the scroll feel. */
 .reveal {
-  opacity: 0;
+  opacity: 0.94;
   transform: translateY(40px);
-  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .reveal.visible {

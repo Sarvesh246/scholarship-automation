@@ -14,20 +14,34 @@ export default function ForgotPasswordPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      showToast({ title: "Enter your email", variant: "danger" });
+      return;
+    }
     setLoading(true);
     try {
-      await sendPasswordReset(email);
+      await sendPasswordReset(trimmedEmail);
       showToast({
         title: "Reset link sent",
         message: "Check your inbox for a password reset email.",
         variant: "success"
       });
-    } catch {
-      showToast({
-        title: "Unable to send reset",
-        message: "Please confirm your email and try again.",
-        variant: "danger"
-      });
+    } catch (err: unknown) {
+      const code = err && typeof err === "object" && "code" in err ? (err as { code: string }).code : "";
+      if (code === "auth/invalid-email") {
+        showToast({
+          title: "Invalid email",
+          message: "Please enter a valid email address.",
+          variant: "danger"
+        });
+      } else {
+        showToast({
+          title: "Unable to send reset",
+          message: "Please confirm your email and try again.",
+          variant: "danger"
+        });
+      }
     } finally {
       setLoading(false);
     }

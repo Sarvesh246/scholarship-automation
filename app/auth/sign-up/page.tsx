@@ -17,6 +17,7 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googlePopupBlocked, setGooglePopupBlocked] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showToast } = useToast();
@@ -47,44 +48,73 @@ export default function SignUpPage() {
     }
     setLoading(true);
     try {
-      await signUpWithEmail(email, password);
+      const trimmedEmail = email.trim();
+      if (!trimmedEmail) {
+        showToast({ title: "Email is required", variant: "danger" });
+        setLoading(false);
+        return;
+      }
+      await signUpWithEmail(trimmedEmail, password);
       if (name.trim()) {
         await updateUserDisplayName(name.trim());
       }
       setAuthCookie();
-      router.push(redirectTo);
+      router.replace(redirectTo);
       showToast({
         title: "Account created",
         message: "Welcome to your scholarship workspace.",
         variant: "success"
       });
-    } catch {
-      showToast({
-        title: "Sign-up failed",
-        message: "Please check your details and try again.",
-        variant: "danger"
-      });
+    } catch (err: unknown) {
+      const code = err && typeof err === "object" && "code" in err ? (err as { code: string }).code : "";
+      if (code === "auth/email-already-in-use") {
+        showToast({
+          title: "Email already in use",
+          message: "Sign in instead or use a different email.",
+          variant: "danger"
+        });
+      } else {
+        showToast({
+          title: "Sign-up failed",
+          message: "Please check your details and try again.",
+          variant: "danger"
+        });
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleSignUp = async () => {
+    setGooglePopupBlocked(false);
     setLoading(true);
     try {
       await signInWithGoogle();
       setAuthCookie();
-      router.push(redirectTo);
+      router.replace(redirectTo);
       showToast({
         title: "Signed up with Google",
         variant: "success"
       });
-    } catch {
-      showToast({
-        title: "Google sign-up failed",
-        message: "Please try again.",
-        variant: "danger"
-      });
+    } catch (err: unknown) {
+      const obj = err && typeof err === "object" ? (err as Record<string, unknown>) : {};
+      const errObj = obj.error && typeof obj.error === "object" ? (obj.error as Record<string, unknown>) : null;
+      const code = (obj.code ?? errObj?.code ?? "") as string;
+      if (code === "auth/popup-blocked") {
+        setGooglePopupBlocked(true);
+        showToast({
+          title: "Popup blocked",
+          message: "Allow popups for this site, then click Try again below.",
+          variant: "danger"
+        });
+      } else {
+        setGooglePopupBlocked(false);
+        showToast({
+          title: "Google sign-up failed",
+          message: "Please try again.",
+          variant: "danger"
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -103,12 +133,21 @@ export default function SignUpPage() {
         type="button"
         variant="secondary"
         className="w-full justify-center"
-        onClick={handleGoogleSignUp}
+        onClick={() => { setGooglePopupBlocked(false); handleGoogleSignUp(); }}
         disabled={loading}
         leftIcon={<GoogleLogo className="h-5 w-5" />}
       >
         Sign up with Google
       </Button>
+      {googlePopupBlocked && (
+        <p className="text-xs text-amber-400">
+          Popup was blocked. Allow popups for this site, then{" "}
+          <button type="button" onClick={() => handleGoogleSignUp()} className="underline font-medium hover:no-underline">
+            try again
+          </button>
+          .
+        </p>
+      )}
 
       <Divider label="or continue with email" />
 

@@ -6,11 +6,41 @@ import { cn } from "@/lib/utils";
 import { navItems } from "./navItems";
 import { useUser } from "@/hooks/useUser";
 import { useAdmin } from "@/hooks/useAdmin";
+import { useState, useEffect } from "react";
+import { getApplications } from "@/lib/applicationStorage";
+import { getScholarships } from "@/lib/scholarshipStorage";
 
 export function SidebarNav() {
   const pathname = usePathname();
   const { displayName, email, initials } = useUser();
   const { isAdmin } = useAdmin();
+  const [counts, setCounts] = useState<{ applications: number; deadlinesSoon: number }>({ applications: 0, deadlinesSoon: 0 });
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([getApplications(), getScholarships()]).then(([apps, schols]) => {
+      if (cancelled) return;
+      const now = new Date();
+      const in7 = new Date(now);
+      in7.setDate(now.getDate() + 7);
+      let soon = 0;
+      for (const app of apps) {
+        const s = schols.find((sch) => sch.id === app.scholarshipId);
+        if (s?.deadline) {
+          const d = new Date(s.deadline);
+          if (d >= now && d <= in7) soon++;
+        }
+      }
+      setCounts({ applications: apps.length, deadlinesSoon: soon });
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const getBadge = (href: string): number | undefined => {
+    if (href === "/app/applications") return counts.applications;
+    if (href === "/app/deadlines") return counts.deadlinesSoon;
+    return undefined;
+  };
 
   return (
     <aside className="hidden h-screen w-64 shrink-0 border-r border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-4 md:flex md:flex-col">
@@ -47,7 +77,12 @@ export function SidebarNav() {
                 <span className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-amber-500" />
               )}
               {item.icon}
-              <span>{item.label}</span>
+              <span className="flex-1">{item.label}</span>
+              {(() => { const b = getBadge(item.href); return b != null && b > 0 ? (
+                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500/20 px-1.5 text-[10px] font-semibold text-amber-400">
+                  {b > 99 ? "99+" : b}
+                </span>
+              ) : null; })()}
             </Link>
           );
         })}

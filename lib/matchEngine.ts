@@ -24,11 +24,22 @@ function inferGradeLevel(graduationYear?: string): string | undefined {
   return undefined;
 }
 
-/** Build user signals from profile for matching. */
+/** Build user signals from profile for matching. Converts custom GPA scales to 4.0 for scholarship matching. */
 export function buildUserSignals(profile: Profile): UserSignals {
   const loc = profile.location ?? {};
   const ac = profile.academics ?? {};
-  const gpaNum = ac.gpa?.trim() ? parseFloat(ac.gpa) : null;
+  const gpaRaw = ac.gpa?.trim() ? parseFloat(ac.gpa) : null;
+  const scale = ac.gpaScale === "5.0" ? "5.0" : ac.gpaScale === "custom" && ac.gpaScaleCustom != null && ac.gpaScaleCustom > 0 ? "custom" : "4.0";
+  let gpaNum: number | null = null;
+  if (gpaRaw != null && Number.isFinite(gpaRaw)) {
+    if (scale === "custom" && ac.gpaScaleCustom != null && ac.gpaScaleCustom > 0) {
+      gpaNum = (gpaRaw / ac.gpaScaleCustom) * 4;
+      gpaNum = Math.round(gpaNum * 100) / 100;
+    } else if (scale !== "custom") {
+      // Only use raw GPA when scale is 4.0 or 5.0. If profile says "custom" but gpaScaleCustom is invalid, don't use GPA (avoids treating e.g. 15/100 as 4.0-scale).
+      gpaNum = gpaRaw;
+    }
+  }
   const majors: string[] = [...(profile.intendedMajors ?? [])];
   if (profile.majorsFreeText?.trim()) {
     profile.majorsFreeText.split(/[,;]/).map((s) => s.trim()).filter(Boolean).forEach((m) => {
@@ -57,8 +68,8 @@ export function buildUserSignals(profile: Profile): UserSignals {
     gradeLevel: inferGradeLevel(ac.graduationYear),
     majors,
     fields: majors, // use majors as fields for now
-    gpa: gpaNum != null && Number.isFinite(gpaNum) ? gpaNum : null,
-    gpaScale: ac.gpaScale === "5.0" ? "5.0" : "4.0",
+    gpa: gpaNum,
+    gpaScale: scale === "custom" ? "4.0" : (scale === "5.0" ? "5.0" : "4.0"),
     activityTypes,
     activityTags,
     awardCategories,
@@ -125,7 +136,8 @@ function hardGate(
   return { pass: true, missingRequirements: missing, failedCriteria: [] };
 }
 
-/** Score 0–100: major/field, location, grade/edu, tag overlap, requirements fit, quality bonus. */
+/** Score 0–100: major/field, location, grade/edu, tag overlap, requirements fit, quality bonus.
+ * Uses only real profile and scholarship data; adds small differentiation from deadline and specificity so identical norms don't all show the same %. */
 function scoreMatch(
   norm: NormalizedScholarship,
   s: Scholarship,
@@ -147,6 +159,8 @@ function scoreMatch(
     score += 25;
     if (signals.majors.length) reasons.push(signals.majors.slice(0, 2).join(", "));
   }
+  const specificMatch = (majorMatch && !norm.majorsEligible.includes("*")) || (fieldMatch && !norm.fieldsEligible.includes("*"));
+  if (specificMatch) score += 3;
 
   const locationMatch = norm.statesEligible.includes("*") || (signals.state && norm.statesEligible.includes(signals.state.toUpperCase().slice(0, 2)));
   if (locationMatch) {
@@ -180,7 +194,16 @@ function scoreMatch(
   score += qualityBonus;
   if (norm.verifiedStatus === "approved") reasons.push("Verified");
 
-  return { score: Math.min(100, score), reasons: [...new Set(reasons)].slice(0, 6) };
+  const deadline = (s.deadline ?? "").replace(/T.*$/, "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(deadline)) {
+    const daysUntil = Math.ceil((new Date(deadline).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+    if (daysUntil >= 0 && daysUntil <= 60) score += Math.max(0, 2 - Math.floor(daysUntil / 30));
+  }
+
+  const amount = typeof s.amount === "number" && s.amount >= 0 ? s.amount : 0;
+  if (amount >= 10000) score += 1;
+
+  return { score: Math.min(100, Math.round(score)), reasons: [...new Set(reasons)].slice(0, 6) };
 }
 
 /** Build a minimal normalized-like shape from raw scholarship when normalized is missing, so we can still score and show something. */

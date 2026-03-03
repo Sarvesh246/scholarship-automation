@@ -11,21 +11,22 @@ import { useToast } from "@/components/ui/Toast";
 import { getProfile, saveProfile } from "@/lib/profileStorage";
 import { updateUserDisplayName } from "@/lib/auth";
 import { useUser } from "@/hooks/useUser";
+import { invalidateMatchCache } from "@/lib/matchEngine";
 import { getProfileCompletion, getMissingItemsForMatchUnlock } from "@/lib/profileCompletion";
 import type { Profile } from "@/types";
 
 export default function ProfilePage() {
   const { showToast } = useToast();
-  const { displayName, email, initials } = useUser();
+  const { user, displayName, email, initials } = useUser();
   const [fullName, setFullName] = useState("");
   const [academics, setAcademics] = useState({ gpa: "", major: "", graduationYear: "" });
   const [activities, setActivities] = useState<{ id: string; name: string; role: string }[]>([]);
   const [awards, setAwards] = useState<{ id: string; name: string; year: string }[]>([]);
   const [financial, setFinancial] = useState<Record<string, string>>({ context: "" });
   const [location, setLocation] = useState({ country: "", state: "", city: "" });
-  const [educationLevel, setEducationLevel] = useState<"high_school" | "college" | "grad" | "">("");
   const [schoolName, setSchoolName] = useState("");
-  const [gpaScale, setGpaScale] = useState<"4.0" | "5.0">("4.0");
+  const [gpaScale, setGpaScale] = useState<"4.0" | "5.0" | "custom">("4.0");
+  const [gpaScaleCustom, setGpaScaleCustom] = useState("");
   const [intendedMajors, setIntendedMajors] = useState<string[]>([]);
   const [majorsFreeText, setMajorsFreeText] = useState("");
   const [timeBudgetPreference, setTimeBudgetPreference] = useState<"low" | "medium" | "high">("medium");
@@ -58,9 +59,9 @@ export default function ProfilePage() {
         state: p.location?.state ?? p.demographics?.state ?? "",
         city: p.location?.city ?? p.demographics?.city ?? "",
       });
-      setEducationLevel((p.educationLevel as "" | "high_school" | "college" | "grad") ?? "");
-      setSchoolName(p.schoolName ?? "");
-      setGpaScale(p.academics?.gpaScale === "5.0" ? "5.0" : "4.0");
+      setSchoolName(p.schoolName ?? p.demographics?.school ?? "");
+      setGpaScale(p.academics?.gpaScale === "5.0" ? "5.0" : p.academics?.gpaScale === "custom" ? "custom" : "4.0");
+      setGpaScaleCustom(p.academics?.gpaScaleCustom != null ? String(p.academics.gpaScaleCustom) : "");
       setIntendedMajors(Array.isArray(p.intendedMajors) ? p.intendedMajors : []);
       setMajorsFreeText(p.majorsFreeText ?? "");
       setTimeBudgetPreference(p.timeBudgetPreference ?? "medium");
@@ -72,13 +73,22 @@ export default function ProfilePage() {
     return () => { cancelled = true; };
   }, []);
 
+  const customScaleNum = (() => {
+    const n = parseFloat(gpaScaleCustom);
+    return Number.isFinite(n) && n >= 1 && n <= 1000 ? n : 0;
+  })();
+
   const profile: Profile = {
-    academics: { ...academics, gpaScale },
+    academics: {
+      ...academics,
+      gpaScale: gpaScale === "custom" && customScaleNum > 0 ? "custom" : gpaScale === "5.0" ? "5.0" : "4.0",
+      gpaScaleCustom: gpaScale === "custom" && customScaleNum > 0 ? customScaleNum : undefined,
+    },
     activities: [...activities],
     awards: [...awards],
     financial: { ...financial },
     location: location.country || location.state || location.city ? location : undefined,
-    educationLevel: educationLevel || undefined,
+    educationLevel: "high_school",
     schoolName: schoolName.trim() || undefined,
     intendedMajors: intendedMajors.length ? intendedMajors : undefined,
     majorsFreeText: majorsFreeText.trim() || undefined,
@@ -91,8 +101,13 @@ export default function ProfilePage() {
   const { count: missingCount, suggestions } = getMissingItemsForMatchUnlock(profile);
 
   const handleSaveAll = async () => {
-    if (academics.gpa && (isNaN(Number(academics.gpa)) || Number(academics.gpa) < 0 || Number(academics.gpa) > 5)) {
-      showToast({ title: "Invalid GPA", message: "GPA must be a number between 0 and 5.0.", variant: "danger" });
+    const gpaMax = gpaScale === "custom" && customScaleNum > 0 ? customScaleNum : gpaScale === "5.0" ? 5 : 4;
+    if (academics.gpa && (isNaN(Number(academics.gpa)) || Number(academics.gpa) < 0 || Number(academics.gpa) > gpaMax)) {
+      showToast({ title: "Invalid GPA", message: gpaScale === "custom" ? `GPA must be between 0 and ${gpaMax} on your scale.` : `GPA must be between 0 and ${gpaMax} for a ${gpaScale} scale.`, variant: "danger" });
+      return;
+    }
+    if (gpaScale === "custom" && academics.gpa && (!gpaScaleCustom.trim() || customScaleNum <= 0)) {
+      showToast({ title: "Invalid scale", message: "Enter a custom scale between 1 and 1000 (e.g. 6 or 100).", variant: "danger" });
       return;
     }
     const yr = academics.graduationYear;
@@ -105,6 +120,7 @@ export default function ProfilePage() {
       await updateUserDisplayName(fullName.trim());
     }
     await saveProfile(profile);
+    if (user?.uid) invalidateMatchCache(user.uid);
     setSaving(false);
     showToast({
       title: "Profile saved",
@@ -206,18 +222,43 @@ export default function ProfilePage() {
           />
           <div>
             <p className="mb-1 text-xs font-medium text-[var(--muted)]">GPA scale</p>
-            <div className="flex gap-2">
-              {(["4.0", "5.0"] as const).map((scale) => (
+            <div className="flex flex-wrap items-center gap-2">
+              {(["4.0", "5.0", "custom"] as const).map((scale) => (
                 <button
                   key={scale}
                   type="button"
                   onClick={() => setGpaScale(scale)}
                   className={`rounded-lg px-3 py-1.5 text-sm ${gpaScale === scale ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "border border-[var(--border)] text-[var(--muted)]"}`}
                 >
-                  {scale}
+                  {scale === "custom" ? "Custom" : scale}
                 </button>
               ))}
+              {gpaScale === "custom" && (
+                <span className="flex items-center gap-1.5 text-sm">
+                  <span className="text-[var(--muted)]">max</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="e.g. 6 or 100"
+                    value={gpaScaleCustom}
+                    onChange={(e) => setGpaScaleCustom(e.target.value)}
+                    className="w-20 rounded-lg border border-[var(--border)] bg-[var(--input-bg)] px-2 py-1.5 text-sm text-[var(--text)] placeholder:text-[var(--muted)] focus:border-amber-500/50 focus:outline-none"
+                  />
+                </span>
+              )}
             </div>
+            {gpaScale === "custom" && customScaleNum > 0 && academics.gpa && (() => {
+              const g = parseFloat(academics.gpa);
+              const valid = Number.isFinite(g) && g >= 0 && g <= customScaleNum;
+              const equiv = valid ? ((g / customScaleNum) * 4).toFixed(2) : null;
+              return equiv != null ? (
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  Converted to 4.0 scale for matching: <strong>{equiv}</strong>
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-[var(--muted)]">Enter a valid GPA (0–{customScaleNum}) to see the 4.0-scale equivalent.</p>
+              );
+            })()}
           </div>
           <Input
             label="Major / area of study"
@@ -231,19 +272,6 @@ export default function ProfilePage() {
             value={academics.graduationYear}
             onChange={(e) => setAcademics((prev) => ({ ...prev, graduationYear: e.target.value }))}
           />
-          <div>
-            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Education level</p>
-            <select
-              value={educationLevel}
-              onChange={(e) => setEducationLevel(e.target.value as typeof educationLevel)}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm"
-            >
-              <option value="">Select</option>
-              <option value="high_school">High school</option>
-              <option value="college">College</option>
-              <option value="grad">Grad</option>
-            </select>
-          </div>
           <Input
             label="School name (optional)"
             placeholder="e.g. Lincoln High"
@@ -257,6 +285,7 @@ export default function ProfilePage() {
 
         <Card className="space-y-3 p-4">
           <h3 className="text-sm font-semibold font-heading">Location</h3>
+          <p className="text-[11px] text-[var(--muted-2)]">Used to filter scholarships by state.</p>
           <Input
             label="Country"
             placeholder="e.g. USA"
@@ -322,6 +351,7 @@ export default function ProfilePage() {
 
         <Card className="space-y-3 p-4">
           <h3 className="text-sm font-semibold font-heading">Intended major(s)</h3>
+          <p className="text-[11px] text-[var(--muted-2)]">Refines Greenlight matches.</p>
           <Input
             label="Free text (e.g. CS, Biology)"
             placeholder="Comma-separated"
@@ -337,12 +367,14 @@ export default function ProfilePage() {
           <button
             type="button"
             onClick={() => setShowOptionalSection((v) => !v)}
-            className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--text)]"
+            className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--text)] text-left"
           >
             {showOptionalSection ? "−" : "+"} Optional eligibility (only used to filter scholarships)
           </button>
           {showOptionalSection && (
-            <div className="space-y-2 pt-2 text-sm">
+            <>
+              <p className="text-[11px] text-[var(--muted-2)]">We never require this. Adding it unlocks more targeted matches.</p>
+              <div className="space-y-2 pt-2 text-sm">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -397,7 +429,8 @@ export default function ProfilePage() {
               <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
                 Save optional eligibility
               </Button>
-            </div>
+              </div>
+            </>
           )}
         </Card>
 

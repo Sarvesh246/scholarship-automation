@@ -47,7 +47,7 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
 
   return (
     <div
-      className={`flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 text-sm shadow-sm transition-all hover:-translate-y-1 hover:border-amber-500/30 hover:shadow-lg ${
+      className={`flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 text-sm shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-500/25 hover:shadow-md ${
         isExpired ? "opacity-60" : ""
       }`}
     >
@@ -92,17 +92,23 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
         </p>
         {matchResult && matchResult.reasons.length > 0 && (
           <p className="text-[11px] text-emerald-400/90">
-            Matches: {matchResult.reasons.slice(0, 4).join(", ")}
+            Why: {matchResult.reasons.slice(0, 4).join(", ")}
           </p>
         )}
-        <div className="mt-1 flex flex-wrap gap-3 text-xs text-[var(--muted)]">
-          <span className="flex items-center gap-1">
-            <span className="text-amber-400 font-medium">
+        <div className="mt-1 flex flex-wrap items-center gap-4 text-xs">
+          <span className="flex items-center gap-1.5">
+            <span className="text-[var(--muted-2)]" title="Award amount">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </span>
+            <span className={`font-semibold ${(scholarship.amount ?? 0) > 0 ? "text-emerald-500 dark:text-emerald-400" : "text-[var(--muted)]"}`}>
               {(scholarship.amount ?? 0) > 0 ? `$${(scholarship.amount ?? 0).toLocaleString()}` : "Varies"}
             </span>
           </span>
-          <span>Deadline: {deadline}</span>
-          <span>Effort: {scholarship.estimatedTime ?? "—"}</span>
+          <span className="flex items-center gap-1.5 text-[var(--muted)]">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            {scholarship.estimatedTime ?? "—"}
+          </span>
+          <span className="text-[var(--muted-2)]">Deadline: {deadline}</span>
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {(scholarship.normalized?.requirements ?? []).slice(0, 4).map((req) => (

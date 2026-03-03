@@ -1,8 +1,16 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
+import { useAdmin, getIdToken } from "@/hooks/useAdmin";
+
+interface AdminStats {
+  totalScholarships?: number;
+  matchingHealth?: { matchablePercent?: number; averageQualityScore?: number | null };
+  syncHistory?: { source: string; at?: { _seconds?: number } }[];
+}
 
 const adminSections = [
   {
@@ -98,12 +106,56 @@ const adminSections = [
 ];
 
 export default function AdminPage() {
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const { isAdmin } = useAdmin();
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    getIdToken().then((token) => {
+      if (!token) return;
+      fetch("/api/admin/stats", { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => data && setStats(data))
+        .catch(() => {});
+    });
+  }, [isAdmin]);
+
+  const lastSync = stats?.syncHistory?.[0];
+  const lastSyncTime = lastSync?.at && typeof lastSync.at === "object" && "_seconds" in lastSync
+    ? new Date((lastSync.at as { _seconds: number })._seconds * 1000).toLocaleString()
+    : null;
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Admin"
         subtitle="Manage scholarships and run syncs from the website."
       />
+      {stats && (
+        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm">
+          <span className="font-medium text-[var(--text)]">
+            <span className="text-[var(--muted)]">Total scholarships:</span> {stats.totalScholarships ?? "—"}
+          </span>
+          {stats.matchingHealth != null && (
+            <>
+              <span className="font-medium text-[var(--text)]">
+                <span className="text-[var(--muted)]">% matchable:</span> {stats.matchingHealth.matchablePercent ?? "—"}%
+              </span>
+              <span className="font-medium text-[var(--text)]">
+                <span className="text-[var(--muted)]">Avg quality score:</span> {stats.matchingHealth.averageQualityScore ?? "—"}
+              </span>
+            </>
+          )}
+          {lastSyncTime && (
+            <span className="text-[var(--muted-2)]">
+              Last sync: {lastSync?.source ?? "—"} at {lastSyncTime}
+            </span>
+          )}
+          <Link href="/app/admin/dashboard" className="text-amber-400 hover:underline text-xs font-medium">
+            View full dashboard →
+          </Link>
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {adminSections.map((section) => (
           <Link key={section.href} href={section.href}>

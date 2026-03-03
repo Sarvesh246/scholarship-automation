@@ -174,10 +174,33 @@ export default function DashboardPage() {
     [applications, scholarships]
   );
 
+  const deadlinesIn14Days = useMemo(
+    () => getDeadlinesForNextDays(applicationDeadlines, 14),
+    [applicationDeadlines]
+  );
+  const potentialEligibleSum = useMemo(() => {
+    return scholarships
+      .filter((s) => !applicationIds.has(s.id))
+      .filter((s) => {
+        const r = matchResults.find((m) => m.id === s.id);
+        return r && (r.eligibilityStatus === "eligible" || r.eligibilityStatus === "almost_eligible") && r.matchScore >= GREENLIGHT_MIN_SCORE;
+      })
+      .reduce((sum, s) => sum + (s.amount ?? 0), 0);
+  }, [scholarships, applicationIds, matchResults]);
+  const highestMatchPct = useMemo(() => {
+    if (matchResults.length === 0) return null;
+    const eligible = matchResults.filter(
+      (r) => r.eligibilityStatus === "eligible" || r.eligibilityStatus === "almost_eligible"
+    );
+    if (eligible.length === 0) return null;
+    return Math.max(...eligible.map((r) => r.matchScore));
+  }, [matchResults]);
+
   const statCards = [
     {
-      label: "Scholarships you qualify for",
+      label: "You qualify for",
       value: greenlightEligibleCount,
+      sub: "scholarships",
       icon: (
         <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -186,28 +209,9 @@ export default function DashboardPage() {
       iconBg: "bg-emerald-500/10"
     },
     {
-      label: "In your pipeline",
-      value: applications.length,
-      icon: (
-        <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-        </svg>
-      ),
-      iconBg: "bg-amber-500/10"
-    },
-    {
-      label: "In progress",
-      value: inProgress,
-      icon: (
-        <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      ),
-      iconBg: "bg-blue-500/10"
-    },
-    {
       label: "Due soon (7 days)",
       value: dueSoon,
+      sub: applications.length > 0 ? `${applications.length} in pipeline` : null,
       icon: (
         <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -216,8 +220,20 @@ export default function DashboardPage() {
       iconBg: "bg-red-500/10"
     },
     {
+      label: "In progress",
+      value: inProgress,
+      sub: null,
+      icon: (
+        <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      ),
+      iconBg: "bg-blue-500/10"
+    },
+    {
       label: "Estimated $ applied",
       value: `$${estimatedSum.toLocaleString()}`,
+      sub: potentialEligibleSum > 0 ? `Up to $${(potentialEligibleSum / 1000).toFixed(0)}k more to discover` : null,
       icon: (
         <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -242,30 +258,46 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title="Dashboard"
-        subtitle={dueSoon === 0 ? "No deadlines this week. Browse scholarships to get started." : `You have ${dueSoon} deadline${dueSoon === 1 ? "" : "s"} this week.`}
+        subtitle={
+          pipelineCards.length === 0
+            ? greenlightEligibleCount > 0
+              ? "Start an application from the list below or browse all."
+              : "Browse scholarships to see matches and your pipeline here."
+            : dueSoon > 0
+              ? `${dueSoon} due this week — keep going.`
+              : "Browse scholarships or continue your applications."
+        }
         primaryAction={
           <Link
             href="/app/scholarships"
             className="btn-gold text-sm py-2 px-5"
           >
-            Start application
+            {pipelineCards.length === 0 ? "Start your first application" : "Start application"}
           </Link>
         }
       />
 
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-5">
-        {statCards.map((stat) => (
-          <Card key={stat.label} className="p-4">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        {statCards.map((stat, i) => (
+          <Card
+            key={stat.label}
+            className={`p-4 ${i === 0 ? "ring-1 ring-emerald-500/20 bg-emerald-500/5" : ""}`}
+          >
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 ${stat.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
+              <div className={`w-9 h-9 ${stat.iconBg} rounded-lg flex items-center justify-center shrink-0`}>
                 {stat.icon}
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-[var(--muted-2)]">{stat.label}</p>
-                <p className="mt-0.5 text-2xl font-bold font-heading">{stat.value}</p>
+                <p className="mt-0.5 text-xl font-bold font-heading tabular-nums">
+                  {stat.value}{stat.sub === "scholarships" ? ` ${stat.sub}` : ""}
+                </p>
+                {stat.sub != null && stat.sub !== "scholarships" && (
+                  <p className="mt-0.5 text-[11px] text-[var(--muted-2)]">{stat.sub}</p>
+                )}
               </div>
             </div>
           </Card>
@@ -277,32 +309,27 @@ export default function DashboardPage() {
           <h2 className="text-sm font-medium text-[var(--muted)]">
             Top recommended for you
           </h2>
-          <p className="text-xs text-[var(--muted-2)]">
-            {greenlightEligibleCount} scholarship{greenlightEligibleCount === 1 ? "" : "s"} you qualify for. Start with these:
-          </p>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {topRecommended.map(({ scholarship, matchScore }) => (
               <Card key={scholarship.id} className="p-4 flex flex-col">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-medium text-[var(--text)] line-clamp-2">
+                  <h3 className="font-medium text-[var(--text)] text-sm line-clamp-2">
                     {decodeHtmlEntities(scholarship.title)}
                   </h3>
                   <span className="shrink-0 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold px-2 py-0.5">
-                    {matchScore}% match
+                    {matchScore}%
                   </span>
                 </div>
-                {scholarship.deadline && (
-                  <p className="mt-1 text-xs text-[var(--muted-2)]">
-                    Due {new Date(scholarship.deadline).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-                  </p>
-                )}
-                {scholarship.amount != null && scholarship.amount > 0 && (
-                  <p className="mt-0.5 text-xs text-[var(--muted-2)]">
-                    Award: ${scholarship.amount.toLocaleString()}
-                  </p>
-                )}
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--muted-2)]">
+                  {scholarship.deadline && (
+                    <span>Due {new Date(scholarship.deadline).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
+                  )}
+                  {scholarship.amount != null && scholarship.amount > 0 && (
+                    <span>${scholarship.amount.toLocaleString()}</span>
+                  )}
+                </div>
                 <Button
-                  className="mt-3 w-full btn-gold text-sm py-2"
+                  className="mt-3 w-full btn-gold text-sm py-1.5"
                   onClick={async () => {
                     const app = await ensureApplication(scholarship.id);
                     router.push(`/app/applications/${app.id}`);
@@ -321,14 +348,13 @@ export default function DashboardPage() {
           Applications pipeline
         </h2>
         {pipelineCards.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-8 text-center">
-            <p className="text-sm font-medium text-[var(--text)]">No applications yet</p>
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              Browse scholarships and start an application to see it here.
+          <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-6 text-center">
+            <p className="text-sm text-[var(--muted)]">
+              {greenlightEligibleCount > 0 ? "Pick one above or browse all to get started." : "Start an application to see it here."}
             </p>
             <Link
               href="/app/scholarships"
-              className="btn-gold mt-4 inline-flex text-sm py-2 px-5"
+              className="btn-gold mt-3 inline-flex text-sm py-2 px-4"
             >
               Browse scholarships
             </Link>

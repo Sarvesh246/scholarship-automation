@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { DropdownMenu, DropdownItem } from "@/components/ui/DropdownMenu";
 import { useToast } from "@/components/ui/Toast";
@@ -18,6 +18,23 @@ export function TopBar({ pageTitle, onMobileMenuToggle }: TopBarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [searchValue, setSearchValue] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      if (e.key === "/" && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const { showToast } = useToast();
   const { initials } = useUser();
   const { items: notifications, loading: notificationsLoading, refresh: refreshNotifications, unreadCount, markAllAsRead } = useNotifications();
@@ -83,13 +100,14 @@ export function TopBar({ pageTitle, onMobileMenuToggle }: TopBarProps) {
         </h1>
       </div>
       <div className="flex flex-1 items-center justify-end gap-3">
-        <div className="hidden max-w-xs flex-1 items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--muted)] md:flex transition-all focus-within:border-amber-500/50 focus-within:shadow-[0_0_0_3px_rgba(217,119,6,0.1)]">
+        <div className="hidden max-w-xs flex-1 items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--muted)] md:flex transition-all focus-within:border-amber-500/50 focus-within:shadow-[0_0_0_3px_rgba(217,119,6,0.1)]">
           <svg className="w-4 h-4 text-[var(--muted-2)] mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
-            placeholder="Search scholarships (press Enter)"
-            className="h-6 w-full bg-transparent text-xs text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none"
+            ref={searchInputRef}
+            placeholder="Search scholarships — Ctrl K or ⌘ K"
+            className="h-7 w-full bg-transparent text-sm text-[var(--text)] placeholder:text-[var(--muted-2)] focus:outline-none"
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             onKeyDown={handleSearchKeyDown}

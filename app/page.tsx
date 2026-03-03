@@ -97,11 +97,30 @@ function useReveal() {
           }
         });
       },
-      { threshold: 0.1 }
+      {
+        threshold: 0.05,
+        rootMargin: "0px 0px 80px 0px",
+      }
     );
 
-    document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+    const observeAll = () => {
+      const els = document.querySelectorAll(".reveal");
+      els.forEach((el) => {
+        observer.observe(el);
+        const rect = el.getBoundingClientRect();
+        const inView = rect.top < window.innerHeight + 80 && rect.bottom > -80;
+        if (inView) el.classList.add("visible");
+      });
+    };
+
+    observeAll();
+    const t = setTimeout(observeAll, 200);
+    const raf = requestAnimationFrame(() => requestAnimationFrame(observeAll));
+    return () => {
+      clearTimeout(t);
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
   }, []);
 }
 
@@ -369,26 +388,26 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center pt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+      {/* Hero Section - reveal with dynamic delay: left immediate, right 0.2s */}
+      <section className="relative min-h-screen flex items-center pt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
             <div className="reveal">
-              <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-4 py-2 mb-6">
+              <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-4 py-2 mb-4">
                 <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
                 <span className="text-amber-400 text-sm font-medium">Your scholarship co-pilot, launching soon</span>
               </div>
 
-              <h1 className="hero-title font-heading mb-6">
+              <h1 className="hero-title font-heading mb-4">
                 Find Your Path to a <span className="hero-highlight">Brighter Future</span>
               </h1>
 
-              <p className="text-lg text-gray-400 mb-8 max-w-xl">
+              <p className="text-base lg:text-lg text-gray-400 mb-5 max-w-xl">
                 Discover personalized scholarship opportunities tailored to your unique profile.
                 Our smart matching system connects you with funding that fits your goals.
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-4 mb-12">
+              <div className="flex flex-col sm:flex-row gap-3 mb-6">
                 <Link href="/auth/sign-up" className="btn-gold">
                   Start Your Journey
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -405,21 +424,21 @@ export default function LandingPage() {
               </div>
 
               {/* Stats */}
-              <div ref={statsRef} className="grid grid-cols-3 gap-6">
+              <div ref={statsRef} className="grid grid-cols-3 gap-4">
                 <div>
                   <div className="stat-number" data-target="0">0</div>
-                  <div className="text-gray-500 text-sm">Scholarships Listed</div>
+                  <div className="text-gray-500 text-xs sm:text-sm">Scholarships Listed</div>
                 </div>
                 <div>
                   <div className="stat-number" data-target="0">0</div>
-                  <div className="text-gray-500 text-sm">Applications Sent</div>
+                  <div className="text-gray-500 text-xs sm:text-sm">Applications Sent</div>
                 </div>
                 <div>
                   <div className="stat-number" data-target="0">0</div>
-                  <div className="text-gray-500 text-sm">Awards Won</div>
+                  <div className="text-gray-500 text-xs sm:text-sm">Awards Won</div>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 mt-4">
+              <div className="flex items-center gap-1.5 mt-2">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -428,7 +447,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Hero Visual */}
+            {/* Hero Visual - reveal with 0.2s delay (content-driven, like original) */}
             <div className="reveal relative" style={{ transitionDelay: "0.2s" }}>
               <div className="dashboard-preview">
                 <div className="dashboard-header">
@@ -437,7 +456,7 @@ export default function LandingPage() {
                   <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
                   <span className="text-xs text-gray-500 ml-2">My Applications</span>
                 </div>
-                <div className="p-6 space-y-4">
+                <div className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Your Progress</span>
                     <span className="text-amber-400 text-sm">4 of 6 complete</span>
@@ -446,13 +465,13 @@ export default function LandingPage() {
                     <div className="progress-fill" style={{ width: "66%" }} />
                   </div>
 
-                  <div className="space-y-3 mt-6">
+                  <div className="space-y-2 mt-4">
                     {[
                       { name: "Tech Excellence Award", amount: "$5,000", status: "Approved", statusClass: "status-approved", iconBg: "bg-amber-500/20", iconColor: "text-amber-400", icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" },
                       { name: "Future Leaders Program", amount: "$10,000", status: "In Review", statusClass: "status-review", iconBg: "bg-blue-500/20", iconColor: "text-blue-400", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
                       { name: "STEM Innovation Grant", amount: "$7,500", status: "Pending", statusClass: "status-pending", iconBg: "bg-yellow-500/20", iconColor: "text-yellow-400", icon: "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }
                     ].map((item) => (
-                      <div key={item.name} className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
+                      <div key={item.name} className="flex items-center justify-between p-2.5 bg-gray-900/50 rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 ${item.iconBg} rounded-lg flex items-center justify-center`}>
                             <svg className={`w-5 h-5 ${item.iconColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -472,16 +491,16 @@ export default function LandingPage() {
               </div>
 
               {/* Floating Badge */}
-              <div className="absolute -top-4 -right-4 bg-linear-to-br from-amber-500 to-amber-600 text-black px-4 py-2 rounded-lg shadow-lg transform rotate-3">
-                <div className="text-xs font-medium">NEW MATCH</div>
-                <div className="text-lg font-bold font-heading">$15,000</div>
+              <div className="absolute -top-3 -right-3 bg-linear-to-br from-amber-500 to-amber-600 text-black px-3 py-1.5 rounded-lg shadow-lg transform rotate-3">
+                <div className="text-[10px] font-medium uppercase tracking-wide">New match</div>
+                <div className="text-base font-bold font-heading">$15,000</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 scroll-indicator">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 scroll-indicator">
           <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
           </svg>

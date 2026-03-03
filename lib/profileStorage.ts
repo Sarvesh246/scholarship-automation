@@ -40,7 +40,9 @@ export async function getProfile(): Promise<Profile> {
 
 export async function saveProfile(profile: Profile): Promise<void> {
   const uid = auth?.currentUser?.uid;
-  if (!db || !uid) return;
+  if (!db || !uid) {
+    throw new Error("Not signed in or database unavailable. Please sign in again.");
+  }
   try {
     await setDoc(doc(db, "users", uid), {
       academics: profile.academics ?? {},
@@ -59,7 +61,7 @@ export async function saveProfile(profile: Profile): Promise<void> {
       needBasedInterest: profile.needBasedInterest,
       optionalEligibility: profile.optionalEligibility ?? undefined,
     }, { merge: true });
-  } catch {
-    /* write failed */
+  } catch (e) {
+    throw e;
   }
 }
