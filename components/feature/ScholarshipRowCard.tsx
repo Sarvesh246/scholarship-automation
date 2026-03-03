@@ -52,7 +52,7 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
     }
     if (onStartApplication) {
       setStarting(true);
-      onStartApplication(scholarship).finally(() => setStarting(false));
+      void Promise.resolve(onStartApplication(scholarship)).finally(() => setStarting(false));
     } else {
       router.push(`/app/applications/${scholarship.id}`);
     }
@@ -102,7 +102,7 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
             <Badge variant="success">Featured</Badge>
           )}
           {showHighROI && (
-            <Badge variant="success" title="High opportunity value per hour">High ROI</Badge>
+            <Badge variant="success">High ROI</Badge>
           )}
           {scholarship.displayCategory === "sweepstakes" && (
             <Badge variant="info">Sweepstakes</Badge>

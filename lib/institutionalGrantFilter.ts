@@ -6,6 +6,11 @@
  * Also filters out grants that target non-students (world leaders, senior professionals,
  * faculty development, etc.) so only student-focused grants (high school, college, etc.) are allowed.
  */
+import { INDIVIDUAL_AWARD_CAP } from "./scholarshipDefinition";
+
+/** Max prize amount for admin validation; same as individual award cap. Re-exported for backward compatibility. */
+export const MAX_PRIZE_AMOUNT = INDIVIDUAL_AWARD_CAP;
+
 type ScholarshipLike = { title?: string; sponsor?: string; source?: string; description?: string };
 
 /** Phrases in title that indicate an institutional grant (organizations, not individual students). */

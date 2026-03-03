@@ -111,7 +111,9 @@ export function RichTextEditor({
         {label && (
           <label className="block text-xs font-medium text-[var(--muted)]">{label}</label>
         )}
-        <LoadingScreen message="Preparing editor…" compact className="rounded-lg border border-[var(--border)]" style={{ minHeight }} />
+        <div style={{ minHeight }}>
+          <LoadingScreen message="Preparing editor…" compact className="rounded-lg border border-[var(--border)]" />
+        </div>
       </div>
     );
   }

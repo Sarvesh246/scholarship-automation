@@ -148,7 +148,7 @@ export function isHardExcluded(s: ScholarshipLike): { excluded: boolean; reason?
 export function computeScholarshipScore(s: ScholarshipLike): { score: number; breakdown: string[] } {
   let score = 0;
   const breakdown: string[] = [];
-  const text = [(s.title ?? ""), (s.description ?? "")].toLowerCase();
+  const text = [(s.title ?? ""), (s.description ?? "")].join(" ").toLowerCase();
   const amount = typeof s.amount === "number" ? s.amount : 0;
 
   if (/\bstudents?\b|undergraduate|graduate\s+students?|high\s+school\s+seniors?|college[- ]bound\b/i.test(text)) {

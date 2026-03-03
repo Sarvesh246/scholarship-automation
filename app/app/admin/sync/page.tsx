@@ -149,7 +149,8 @@ export default function AdminSyncPage() {
         </p>
       </Card>
 
-      <Card className="p-4" id="validation">
+      <div id="validation">
+      <Card className="p-4">
         <h3 className="font-medium text-[var(--text)]">STEP 0 — Full validation pass</h3>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Runs quality and <strong>scholarship-definition</strong> checks on every listing: quality score, verification status,
@@ -172,6 +173,7 @@ export default function AdminSyncPage() {
           {validating ? "Validating…" : "Run full validation now"}
         </Button>
       </Card>
+      </div>
 
       {validationResult != null && (
         <Card className="p-4">

@@ -117,7 +117,8 @@ export function mergeDuplicates(
       if (used.has(j)) continue;
       if (isDuplicate(canonical, list[j], { titleSimilarityThreshold: threshold })) {
         used.add(j);
-        if (list[j].applicationUrl) urls.add(list[j].applicationUrl);
+        const url = list[j].applicationUrl;
+        if (url) urls.add(url);
       }
     }
 
