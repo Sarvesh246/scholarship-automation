@@ -97,17 +97,29 @@ export default function ScholarshipsPage() {
 
   useEffect(() => {
     if (!user?.uid || items.length === 0) return;
+    let cancelled = false;
     const run = async () => {
       const profile = await getProfile();
+      if (cancelled) return;
       const cached = getCachedMatches(user.uid);
       if (cached && cached.length === items.length) {
         setMatchResults(cached);
         return;
       }
-      const results = await computeMatchesForUser(user.uid, profile, items);
-      setMatchResults(results);
+      const runMatch = () => {
+        if (cancelled) return;
+        computeMatchesForUser(user.uid, profile, items).then((results) => {
+          if (!cancelled) setMatchResults(results);
+        });
+      };
+      if (typeof requestIdleCallback !== "undefined") {
+        requestIdleCallback(runMatch, { timeout: 600 });
+      } else {
+        setTimeout(runMatch, 0);
+      }
     };
     run();
+    return () => { cancelled = true; };
   }, [user?.uid, items]);
 
   useEffect(() => {

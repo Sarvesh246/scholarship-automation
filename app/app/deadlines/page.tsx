@@ -26,10 +26,11 @@ export default function DeadlinesPage() {
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
-    const [apps, schols] = await Promise.all([getApplications(), getScholarships()]);
+    const apps = await getApplications();
     setApplications(apps);
-    setScholarships(schols);
     setLoading(false);
+    const schols = await getScholarships();
+    setScholarships(schols);
   }, []);
 
   useEffect(() => {
@@ -44,17 +45,29 @@ export default function DeadlinesPage() {
 
   useEffect(() => {
     if (!user?.uid || scholarships.length === 0) return;
+    let cancelled = false;
     const run = async () => {
       const profile = await getProfile();
+      if (cancelled) return;
       const cached = getCachedMatches(user.uid);
       if (cached && cached.length === scholarships.length) {
         setMatchResults(cached.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus })));
         return;
       }
-      const results = await computeMatchesForUser(user.uid, profile, scholarships);
-      setMatchResults(results.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus })));
+      const runMatch = () => {
+        if (cancelled) return;
+        computeMatchesForUser(user.uid, profile, scholarships).then((results) => {
+          if (!cancelled) setMatchResults(results.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus })));
+        });
+      };
+      if (typeof requestIdleCallback !== "undefined") {
+        requestIdleCallback(runMatch, { timeout: 600 });
+      } else {
+        setTimeout(runMatch, 0);
+      }
     };
     run();
+    return () => { cancelled = true; };
   }, [user?.uid, scholarships]);
 
   const applicationIds = useMemo(() => new Set(applications.map((a) => a.scholarshipId)), [applications]);

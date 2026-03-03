@@ -38,11 +38,14 @@ export default function DashboardPage() {
   const [matchResults, setMatchResults] = useState<{ id: string; matchScore: number; eligibilityStatus: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Phase 1: Load applications first so the dashboard can paint quickly (especially on mobile).
+  // Phase 2: Load scholarships in background so pipeline/stat details fill in; match runs deferred.
   const loadData = useCallback(async () => {
-    const [apps, schols] = await Promise.all([getApplications(), getScholarships()]);
+    const apps = await getApplications();
     setApplications(apps);
-    setScholarships(schols);
     setLoading(false);
+    const schols = await getScholarships();
+    setScholarships(schols);
   }, []);
 
   useEffect(() => {
@@ -55,19 +58,32 @@ export default function DashboardPage() {
     return () => window.removeEventListener("focus", onFocus);
   }, [loadData]);
 
+  // Defer match computation so it doesn't block the main thread (helps mobile stay responsive).
   useEffect(() => {
     if (!user?.uid || scholarships.length === 0) return;
+    let cancelled = false;
     const run = async () => {
       const profile = await getProfile();
+      if (cancelled) return;
       const cached = getCachedMatches(user.uid);
       if (cached && cached.length === scholarships.length) {
         setMatchResults(cached.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus })));
         return;
       }
-      const results = await computeMatchesForUser(user.uid, profile, scholarships);
-      setMatchResults(results.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus })));
+      const runMatch = () => {
+        if (cancelled) return;
+        computeMatchesForUser(user.uid, profile, scholarships).then((results) => {
+          if (!cancelled) setMatchResults(results.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus })));
+        });
+      };
+      if (typeof requestIdleCallback !== "undefined") {
+        requestIdleCallback(runMatch, { timeout: 600 });
+      } else {
+        setTimeout(runMatch, 0);
+      }
     };
     run();
+    return () => { cancelled = true; };
   }, [user?.uid, scholarships]);
 
   type DeadlineStatus = "not_started" | "in_progress" | "submitted";
