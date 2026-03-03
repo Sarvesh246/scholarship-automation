@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ScholarshipRowCard } from "@/components/feature/ScholarshipRowCard";
+import { fetchScholarshipsPage } from "@/lib/scholarshipApi";
 import { getScholarships, invalidateScholarshipCache } from "@/lib/scholarshipStorage";
 import { getApplications, ensureApplication } from "@/lib/applicationStorage";
 import { getProfile } from "@/lib/profileStorage";
@@ -32,6 +33,17 @@ type DisplayCategoryFilter = "all" | "scholarships_only" | "sweepstakes_only";
 type DeadlineFilter = "any" | "7" | "30" | "60" | "90";
 type AmountFilter = "any" | "1000" | "2000" | "5000" | "10000";
 type EffortFilter = "any" | "low" | "medium" | "high";
+
+function formatTimeAgo(ms: number): string {
+  const sec = Math.floor((Date.now() - ms) / 1000);
+  if (sec < 60) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} hr ago`;
+  const d = Math.floor(hr / 24);
+  return `${d} day${d !== 1 ? "s" : ""} ago`;
+}
 
 function parseEffort(estimatedTime: string): "low" | "medium" | "high" {
   const t = (estimatedTime || "").toLowerCase();
@@ -76,6 +88,9 @@ export default function ScholarshipsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<number | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const { user } = useUser();
 
@@ -85,11 +100,33 @@ export default function ScholarshipsPage() {
       if (user?.uid) invalidateMatchCache(user.uid);
     }
     setLoading(true);
-    const [data, apps] = await Promise.all([getScholarships(), getApplications()]);
-    setItems(data);
-    setApplicationIds(new Set(apps.map((a) => a.scholarshipId)));
+    try {
+      const [dataRes, apps] = await Promise.all([
+        fetchScholarshipsPage({ limit: 20 }),
+        getApplications(),
+      ]);
+      setItems(dataRes.items);
+      setNextCursor(dataRes.nextCursor);
+      setApplicationIds(new Set(apps.map((a) => a.scholarshipId)));
+    } catch {
+      setItems([]);
+      setNextCursor(null);
+    }
+    setLastRefreshedAt(Date.now());
     setLoading(false);
   }, [user?.uid]);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetchScholarshipsPage({ limit: 20, cursor: nextCursor });
+      setItems((prev) => [...prev, ...res.items]);
+      setNextCursor(res.nextCursor);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore]);
 
   useEffect(() => {
     loadScholarships();
@@ -286,15 +323,28 @@ export default function ScholarshipsPage() {
         title="Scholarships"
         subtitle={greenlightOn ? "Scholarships you qualify for." : "Explore scholarships across the country."}
         primaryAction={
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing || loading}
-          >
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {lastRefreshedAt != null && (
+              <span className="text-[11px] text-[var(--muted-2)]">
+                Last updated {formatTimeAgo(lastRefreshedAt)}
+              </span>
+            )}
+            <Link
+              href="/app/submit"
+              className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--text)] hover:border-amber-500/30 hover:text-amber-400 transition-colors"
+            >
+              Submit a scholarship
+            </Link>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing || loading}
+            >
+              {refreshing ? "Syncing…" : "Run new sync"}
+            </Button>
+          </div>
         }
       />
 
@@ -521,10 +571,24 @@ export default function ScholarshipsPage() {
               hasApplication={false}
               onStartApplication={handleStartApplication}
               matchResult={greenlightOn ? matchResultsMap.get(scholarship.id) : undefined}
+              greenlightHighlight={greenlightOn}
             />
           ))
         )}
       </div>
+
+      {nextCursor != null && (
+        <div className="flex justify-center py-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={loadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? "Loading…" : "Load more scholarships"}
+          </Button>
+        </div>
+      )}
 
       {totalPages > 1 && (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">

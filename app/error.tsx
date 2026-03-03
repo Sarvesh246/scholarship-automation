@@ -29,7 +29,7 @@ export default function ErrorPage({ error, reset }: ErrorProps) {
         <button
           type="button"
           onClick={reset}
-          className="inline-flex items-center gap-2 rounded-lg bg-linear-to-r from-amber-500 to-orange-600 px-5 py-2.5 text-sm font-medium text-black shadow-md transition-all hover:shadow-lg"
+          className="inline-flex items-center gap-2 rounded-lg bg-linear-to-r from-amber-500 to-orange-600 px-5 py-2.5 text-sm font-medium text-[var(--on-primary)] shadow-md transition-all hover:shadow-lg"
         >
           Try again
         </button>

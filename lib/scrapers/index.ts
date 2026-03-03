@@ -6,6 +6,11 @@ import { scrapeBold } from "./bold";
 import { scrapeScholarshipsCom } from "./scholarshipscom";
 import { scrapeScholarships360 } from "./scholarships360";
 import { scrapeCollegeData } from "./collegedata";
+import { scrapeDepartmentPages } from "./departmentPages";
+import { scrapeProfessionalAssociations } from "./professionalAssociations";
+import { scrapeMunicipal } from "./municipal";
+import { scrapeCommunityFoundations } from "./communityFoundations";
+import { scrapeCorporateFoundations } from "./corporateFoundations";
 import type { ScrapedScholarship } from "./types";
 
 export type ScraperId =
@@ -13,7 +18,12 @@ export type ScraperId =
   | "bold"
   | "scholarshipscom"
   | "scholarships360"
-  | "collegedata";
+  | "collegedata"
+  | "department_pages"
+  | "professional_associations"
+  | "municipal"
+  | "community_foundations"
+  | "corporate_foundations";
 
 export const SCRAPERS: Record<ScraperId, { name: string; run: (maxPages?: number) => Promise<ScrapedScholarship[]> }> = {
   collegescholarships: {
@@ -35,6 +45,26 @@ export const SCRAPERS: Record<ScraperId, { name: string; run: (maxPages?: number
   collegedata: {
     name: "CollegeData",
     run: (maxPages = 3) => scrapeCollegeData(maxPages),
+  },
+  department_pages: {
+    name: "University department pages",
+    run: (maxPages = 5) => scrapeDepartmentPages(maxPages),
+  },
+  professional_associations: {
+    name: "Professional associations",
+    run: (maxPages = 5) => scrapeProfessionalAssociations(maxPages),
+  },
+  municipal: {
+    name: "Municipal / city",
+    run: (maxPages = 5) => scrapeMunicipal(maxPages),
+  },
+  community_foundations: {
+    name: "Community foundations",
+    run: (maxPages = 5) => scrapeCommunityFoundations(maxPages),
+  },
+  corporate_foundations: {
+    name: "Corporate foundations",
+    run: (maxPages = 5) => scrapeCorporateFoundations(maxPages),
   },
 };
 

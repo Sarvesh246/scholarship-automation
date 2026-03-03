@@ -14,6 +14,8 @@ export default function AdminScrapePage() {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { showToast } = useToast();
   const [scraping, setScraping] = useState(false);
+  const [cleaningExpired, setCleaningExpired] = useState(false);
+  const [lastCleanupDone, setLastCleanupDone] = useState<number | null>(null);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
 
   const runAllSources = async () => {
@@ -72,7 +74,8 @@ export default function AdminScrapePage() {
       showToast({ title: "Not signed in", variant: "danger" });
       return;
     }
-    setScraping(true);
+    setCleaningExpired(true);
+    setLastCleanupDone(null);
     try {
       const res = await fetch("/api/admin/cleanup-expired", {
         method: "POST",
@@ -90,13 +93,15 @@ export default function AdminScrapePage() {
           variant: "success",
         });
         setResult((prev) => (prev ? { ...prev, cleanup: data } : { cleanup: data }));
+        setLastCleanupDone(total);
+        window.setTimeout(() => setLastCleanupDone(null), 4000);
       } else {
         showToast({ title: "Cleanup failed", message: data.error, variant: "danger" });
       }
     } catch (e) {
       showToast({ title: "Cleanup failed", message: e instanceof Error ? e.message : "Request failed", variant: "danger" });
     } finally {
-      setScraping(false);
+      setCleaningExpired(false);
     }
   };
 
@@ -172,7 +177,7 @@ export default function AdminScrapePage() {
     <div className="space-y-6">
       <PageHeader
         title="Scrape scholarships"
-        subtitle="Pull scholarships from popular websites and add them to your catalog."
+        subtitle="Pull scholarships from aggregators, university departments, professional associations, municipal and community foundations, and more."
         primaryAction={
           <div className="flex gap-2">
             <Button
@@ -194,9 +199,15 @@ export default function AdminScrapePage() {
               type="button"
               variant="secondary"
               onClick={runCleanup}
-              disabled={scraping}
+              disabled={scraping || cleaningExpired}
             >
-              Cleanup expired
+              {cleaningExpired
+                ? "Cleaning…"
+                : lastCleanupDone !== null
+                  ? lastCleanupDone > 0
+                    ? `Done (${lastCleanupDone} removed)`
+                    : "Done (none to remove)"
+                  : "Cleanup expired"}
             </Button>
           </div>
         }

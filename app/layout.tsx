@@ -4,6 +4,7 @@ import "./globals.css";
 import { ReactNode } from "react";
 import { ToastProvider } from "@/components/ui/Toast";
 import { FirebaseAnalyticsInit } from "@/components/FirebaseAnalyticsInit";
+import { ThemeInit } from "@/components/ThemeInit";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -49,10 +50,24 @@ export const metadata: Metadata = {
   }
 };
 
+const themeScript = `
+(function() {
+  var stored = localStorage.getItem('theme');
+  var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  var theme = stored === 'light' || stored === 'dark' ? stored : (prefersDark ? 'dark' : 'light');
+  if (document.body) {
+    if (theme === 'dark') document.body.classList.add('dark');
+    else document.body.classList.remove('dark');
+  }
+})();
+`;
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" data-app-version="firestore-2025-03" className={`${dmSans.variable} ${spaceGrotesk.variable}`}>
-      <body>
+      <body suppressHydrationWarning>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <ThemeInit />
         <ToastProvider>
           <FirebaseAnalyticsInit />
           {children}

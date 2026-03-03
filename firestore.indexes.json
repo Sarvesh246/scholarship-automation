@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "scholarships",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deadline", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -115,8 +115,8 @@ export default function SettingsPage() {
       />
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="space-y-4 p-4">
-          <h3 className="text-sm font-semibold font-heading">Theme</h3>
+        <Card className="flex h-full min-h-0 flex-col space-y-4 p-4">
+          <h3 className="text-sm font-semibold font-heading shrink-0">Theme</h3>
           <div className="flex flex-wrap gap-2">
             {(["light", "dark"] as const).map((t) => (
               <Button
@@ -130,70 +130,77 @@ export default function SettingsPage() {
               </Button>
             ))}
           </div>
-          <p className="text-[10px] text-[var(--muted-2)]">Applies immediately across the app.</p>
+          <p className="text-[10px] text-[var(--muted-2)] shrink-0">Applies immediately across the app.</p>
         </Card>
 
-        <Card className="space-y-4 p-4">
-          <h3 className="text-sm font-semibold font-heading">Notifications</h3>
-          <div className="flex items-center justify-between text-xs">
-            <div>
-              <p className="font-medium text-[var(--text)]">
-                Email summaries
-              </p>
-              <p className="text-[10px] text-[var(--muted-2)]">
-                Occasional summaries of upcoming deadlines.
-              </p>
+        <Card className="flex h-full min-h-0 flex-col space-y-4 p-4">
+          <h3 className="text-sm font-semibold font-heading shrink-0">Notifications</h3>
+          <div className="flex flex-1 min-h-0 flex-col gap-4">
+            <div className="flex items-center justify-between gap-3 text-xs min-w-0">
+              <div className="min-w-0">
+                <p className="font-medium text-[var(--text)]">
+                  Email summaries
+                </p>
+                <p className="text-[10px] text-[var(--muted-2)]">
+                  Occasional summaries of upcoming deadlines.
+                </p>
+              </div>
+              <Switch
+                checked={emailNotifications}
+                onClick={() => setEmailNotifications((v) => !v)}
+                aria-label="Toggle email summaries"
+                className="shrink-0"
+              />
             </div>
-            <Switch
-              checked={emailNotifications}
-              onClick={() => setEmailNotifications((v) => !v)}
-              aria-label="Toggle email summaries"
-            />
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <div>
-              <p className="font-medium text-[var(--text)]">
-                Deadline reminders
-              </p>
-              <p className="text-[10px] text-[var(--muted-2)]">
-                Gentle reminders inside the app.
-              </p>
+            <div className="flex items-center justify-between gap-3 text-xs min-w-0">
+              <div className="min-w-0">
+                <p className="font-medium text-[var(--text)]">
+                  Deadline reminders
+                </p>
+                <p className="text-[10px] text-[var(--muted-2)]">
+                  Gentle reminders inside the app.
+                </p>
+              </div>
+              <Switch
+                checked={deadlineReminders}
+                onClick={() => setDeadlineReminders((v) => !v)}
+                aria-label="Toggle deadline reminders"
+                className="shrink-0"
+              />
             </div>
-            <Switch
-              checked={deadlineReminders}
-              onClick={() => setDeadlineReminders((v) => !v)}
-              aria-label="Toggle deadline reminders"
-            />
+            <Button type="button" size="sm" onClick={handleSave} className="mt-auto shrink-0">
+              Save notification preferences
+            </Button>
           </div>
-          <Button type="button" size="sm" onClick={handleSave}>
-            Save notification preferences
-          </Button>
         </Card>
 
-        <Card className="space-y-4 p-4">
-          <h3 className="text-sm font-semibold font-heading">Account</h3>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-br from-amber-400 to-orange-500 text-sm font-bold text-black shrink-0">
-              {initials}
+        <Card className="flex h-full min-h-0 flex-col space-y-4 p-4">
+          <h3 className="text-sm font-semibold font-heading shrink-0">Account</h3>
+          <div className="flex flex-1 min-h-0 flex-col">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-sm font-bold text-white">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-[var(--text)]">{displayName || "No name set"}</p>
+                <p className="truncate text-[10px] text-[var(--muted-2)]">{email || "No email"}</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-medium">{displayName || "No name set"}</p>
-              <p className="truncate text-[10px] text-[var(--muted-2)]">{email || "No email"}</p>
-            </div>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleSignOut}
+              className="mt-auto shrink-0"
+            >
+              Sign out
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={handleSignOut}
-          >
-            Sign out
-          </Button>
         </Card>
 
-        <Card className="space-y-4 p-4">
-          <h3 className="text-sm font-semibold font-heading">Data</h3>
-          <p className="text-[10px] text-[var(--muted-2)]">
+        <Card className="flex h-full min-h-0 flex-col space-y-4 p-4">
+          <h3 className="text-sm font-semibold font-heading shrink-0">Data</h3>
+          <p className="text-[10px] text-[var(--muted-2)] flex-1 min-h-0">
             Export your profile, applications, and essays as JSON.
           </p>
           <Button
@@ -202,21 +209,26 @@ export default function SettingsPage() {
             size="sm"
             onClick={handleExportData}
             disabled={exporting}
+            className="shrink-0"
           >
             {exporting ? "Exporting…" : "Export my data"}
           </Button>
         </Card>
 
-        <Card className="space-y-4 p-4 border-red-500/20">
-          <h3 className="text-sm font-semibold font-heading text-red-400">Danger zone</h3>
-          <p className="text-[10px] text-[var(--muted-2)]">
+        <Card className="flex h-full min-h-0 flex-col space-y-4 p-4 md:col-span-2 border-2 border-red-500/30 bg-red-500/5 rounded-xl">
+          <h3 className="text-sm font-semibold font-heading text-red-400 shrink-0">Danger zone</h3>
+          <p className="text-xs text-[var(--muted-2)]">
             Permanently delete your account and all your data. This cannot be undone.
+          </p>
+          <p className="text-[11px] text-red-400/80">
+            After deletion you will be signed out and cannot recover your profile, applications, or essays.
           </p>
           <Button
             type="button"
             variant="destructive"
             size="sm"
             onClick={() => setDeleteConfirmOpen(true)}
+            className="shrink-0 self-start"
           >
             Delete account
           </Button>

@@ -27,12 +27,58 @@
   --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
+/* Light theme – warm, editorial, airy (Notion/Linear/Stripe vibe) */
 :root {
+  --bg: #F7F6F2;
+  --bg-secondary: #ECEAE6;
+  --surface: #FFFFFF;
+  --surface-2: #F5F4F0;
+  --border: rgba(0, 0, 0, 0.1);
+  --text: #111111;
+  --muted: #555555;
+  --muted-2: #777777;
+
+  /* Slightly deeper orange in light mode – strong but not neon */
+  --primary: #D97706;
+  --primary-hover: #B45309;
+  --primary-light: #EA580C;
+  --primary-soft: rgba(217, 119, 6, 0.1);
+  --on-primary: #0c0a09;
+
+  --accent-emerald: #047857;
+  --accent-blue: #1d4ed8;
+  --accent-purple: #6d28d9;
+
+  --success: #047857;
+  --success-soft: rgba(4, 120, 87, 0.1);
+  --warning: #B45309;
+  --warning-soft: rgba(180, 83, 9, 0.1);
+  --danger: #b91c1c;
+  --danger-soft: rgba(185, 28, 28, 0.08);
+  --info: #1d4ed8;
+  --info-soft: rgba(29, 78, 216, 0.08);
+  --overlay: rgba(0, 0, 0, 0.4);
+  --nav-glass-bg: rgba(247, 246, 242, 0.9);
+  --section-tint: rgba(217, 119, 6, 0.04);
+
+  --card-border: rgba(0, 0, 0, 0.06);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.04);
+  --card-padding: 1.5rem;
+  --card-hover-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+
+  /* Toast in light: white, thin border, subtle shadow */
+  --toast-bg: #FFFFFF;
+  --toast-border: rgba(0, 0, 0, 0.08);
+  --toast-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* Dark theme – applied on body so React layout cannot overwrite it */
+body.dark {
   --bg: #08080c;
-  --bg-secondary: #0f0f16;
-  --surface: #15151f;
-  --surface-2: #1a1a28;
-  --border: #1e293b;
+  --bg-secondary: #0e0e14;
+  --surface: #16161f;
+  --surface-2: #1c1c28;
+  --border: #252538;
   --text: #f8fafc;
   --muted: #94a3b8;
   --muted-2: #64748b;
@@ -41,6 +87,7 @@
   --primary-hover: #b45309;
   --primary-light: #fbbf24;
   --primary-soft: rgba(217, 119, 6, 0.15);
+  --on-primary: #0c0a09;
 
   --accent-emerald: #10b981;
   --accent-blue: #3b82f6;
@@ -54,6 +101,18 @@
   --danger-soft: rgba(239, 68, 68, 0.1);
   --info: #3b82f6;
   --info-soft: rgba(59, 130, 246, 0.1);
+  --overlay: rgba(0, 0, 0, 0.5);
+  --nav-glass-bg: rgba(8, 8, 12, 0.8);
+  --section-tint: rgba(251, 191, 36, 0.05);
+
+  --card-border: var(--border);
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --card-padding: 1.5rem;
+  --card-hover-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+
+  --toast-bg: var(--surface);
+  --toast-border: var(--border);
+  --toast-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 html {
@@ -72,6 +131,12 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+}
+
+/* Soft light mode: subtle warm gradient for editorial feel */
+body:not(.dark) {
+  background: linear-gradient(180deg, #F9F8F5 0%, #F7F6F2 30%, #F6F5F1 100%);
+  background-attachment: fixed;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -113,10 +178,40 @@ h1, h2, h3, h4, h5, h6 {
   66% { transform: translate(-20px, 20px) scale(0.95); }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Card hover lift is already on components; button glow */
+.btn-gold:hover,
+[class*="btn-gold"]:hover {
+  box-shadow: 0 0 20px rgba(217, 119, 6, 0.25);
+}
+
+/* Toast entrance */
+@keyframes toastEnter {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.toast-enter {
+  animation: toastEnter 0.25s ease-out forwards;
+}
+
 /* ─── Navigation ─────────────────────────────────────────────────── */
 .nav-glass {
   backdrop-filter: blur(20px);
-  background: rgba(8, 8, 12, 0.8);
+  background: var(--nav-glass-bg);
   border-bottom: 1px solid var(--border);
 }
 
@@ -145,10 +240,14 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
 }
 
+.section-tint-bg {
+  background: linear-gradient(to bottom, transparent, var(--section-tint), transparent);
+}
+
 /* ─── Buttons ────────────────────────────────────────────────────── */
 .btn-gold {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-  color: #000;
+  color: var(--on-primary);
   font-weight: 600;
   padding: 12px 28px;
   border-radius: 8px;
@@ -224,9 +323,10 @@ h1, h2, h3, h4, h5, h6 {
 /* ─── Cards ──────────────────────────────────────────────────────── */
 .app-card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-border);
   border-radius: 16px;
-  padding: 24px;
+  padding: var(--card-padding);
+  box-shadow: var(--card-shadow);
   transition: all 0.4s ease;
   position: relative;
   overflow: hidden;
@@ -248,7 +348,7 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--surface-2);
   transform: translateY(-4px);
   border-color: rgba(217, 119, 6, 0.3);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--card-hover-shadow);
 }
 
 .app-card:hover::before {
@@ -257,9 +357,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .scholarship-card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-border);
   border-radius: 16px;
-  padding: 24px;
+  padding: var(--card-padding);
+  box-shadow: var(--card-shadow);
   transition: all 0.4s ease;
   position: relative;
   overflow: hidden;
@@ -281,7 +382,7 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--surface-2);
   transform: translateY(-8px);
   border-color: rgba(217, 119, 6, 0.3);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--card-hover-shadow);
 }
 
 .scholarship-card:hover::before {
@@ -290,7 +391,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ─── Badges ─────────────────────────────────────────────────────── */
 .amount-badge {
-  background: linear-gradient(135deg, rgba(217, 119, 6, 0.2) 0%, rgba(251, 191, 36, 0.1) 100%);
+  background: var(--primary-soft);
   border: 1px solid rgba(217, 119, 6, 0.3);
   color: var(--primary-light);
   padding: 6px 14px;
@@ -299,18 +400,18 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .deadline-badge {
-  background: rgba(239, 68, 68, 0.1);
+  background: var(--danger-soft);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #f87171;
+  color: var(--danger);
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 0.75rem;
 }
 
 .category-tag {
-  background: rgba(59, 130, 246, 0.1);
+  background: var(--info-soft);
   border: 1px solid rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
+  color: var(--info);
   padding: 4px 12px;
   border-radius: 6px;
   font-size: 0.8rem;
@@ -383,18 +484,18 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ─── Status Badges ──────────────────────────────────────────────── */
 .status-pending {
-  background: rgba(251, 191, 36, 0.1);
-  color: #fbbf24;
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
 .status-approved {
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
+  background: var(--success-soft);
+  color: var(--success);
 }
 
 .status-review {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
+  background: var(--info-soft);
+  color: var(--info);
 }
 
 /* ─── Step Cards ─────────────────────────────────────────────────── */

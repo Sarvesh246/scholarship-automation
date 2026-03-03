@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
-import { getFirestore, initializeFirestore, type Firestore, memoryLocalCache } from "firebase/firestore";
+import { getFirestore, initializeFirestore, type Firestore, memoryLocalCache, connectFirestoreEmulator } from "firebase/firestore";
 import { getAnalytics, type Analytics, isSupported } from "firebase/analytics";
 
 /**
@@ -47,9 +47,18 @@ export const auth: Auth | null = app ? getAuth(app) : (null as unknown as Auth);
 export const db: Firestore | null = app
   ? (() => {
       try {
-        return initializeFirestore(app, { localCache: memoryLocalCache() });
+        const store = initializeFirestore(app, { localCache: memoryLocalCache() });
+        if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_USE_FIRESTORE_EMULATOR === "true") {
+          const { connectFirestoreEmulator } = require("firebase/firestore");
+          connectFirestoreEmulator(store, "127.0.0.1", 8080);
+        }
+        return store;
       } catch {
-        return getFirestore(app);
+        const store = getFirestore(app);
+        if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_USE_FIRESTORE_EMULATOR === "true") {
+          connectFirestoreEmulator(store, "127.0.0.1", 8080);
+        }
+        return store;
       }
     })()
   : null;

@@ -2,6 +2,9 @@
  * Firebase Admin SDK for API routes (server-only).
  * Requires FIREBASE_SERVICE_ACCOUNT_KEY env var (full JSON key as string) in production.
  * For local dev, can use GOOGLE_APPLICATION_CREDENTIALS pointing to scripts/serviceAccountKey.json.
+ *
+ * To use the Firestore Emulator (no prod quota): set FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
+ * before starting the dev server. Start the emulator with: firebase emulators:start --only firestore
  */
 
 import { initializeApp, getApps, cert, type ServiceAccount } from "firebase-admin/app";

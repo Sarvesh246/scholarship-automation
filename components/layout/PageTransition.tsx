@@ -26,7 +26,7 @@ export function PageTransition({ children }: PageTransitionProps) {
 
   return (
     <div
-      className={`min-w-0 w-full max-w-6xl mx-auto page-transition-wrap${entering ? " entering" : ""}`}
+      className={`min-w-0 w-full max-w-6xl mx-auto page-transition-wrap animate-fade-in${entering ? " entering" : ""}`}
     >
       {children}
     </div>

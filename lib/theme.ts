@@ -20,11 +20,12 @@ export function getInitialTheme(): Theme {
 
 export function setTheme(theme: Theme) {
   if (typeof window === "undefined") return;
-  const root = window.document.documentElement;
+  const body = window.document.body;
+  if (!body) return;
   if (theme === "dark") {
-    root.classList.add("dark");
+    body.classList.add("dark");
   } else {
-    root.classList.remove("dark");
+    body.classList.remove("dark");
   }
   window.localStorage.setItem(THEME_KEY, theme);
 }

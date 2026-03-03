@@ -19,7 +19,8 @@ export async function POST(request: NextRequest) {
     ]);
     return NextResponse.json({ ok: true, expiredDeleted, junkDeleted, deleted: expiredDeleted + junkDeleted });
   } catch (err) {
+    const message = err instanceof Error ? err.message : "Cleanup failed";
     console.error("[admin/cleanup-expired]", err);
-    return NextResponse.json({ error: "Cleanup failed" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

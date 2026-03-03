@@ -8,8 +8,10 @@ import { useAdmin, getIdToken } from "@/hooks/useAdmin";
 
 interface AdminStats {
   totalScholarships?: number;
+  verifiedPercent?: number;
   matchingHealth?: { matchablePercent?: number; averageQualityScore?: number | null };
   syncHistory?: { source: string; at?: { _seconds?: number } }[];
+  errors?: { id: string }[];
 }
 
 const adminSections = [
@@ -84,6 +86,16 @@ const adminSections = [
     ),
   },
   {
+    href: "/app/admin/moderation",
+    title: "Moderation queue",
+    description: "Review user-submitted scholarships. Approve to add to catalog or reject.",
+    icon: (
+      <svg className="h-8 w-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
     href: "/app/admin/sync",
     title: "Sync scholarships",
     description: "Run ScholarshipOwl, Grants.gov, or custom URL sync. Pull from APIs into Firestore.",
@@ -132,29 +144,35 @@ export default function AdminPage() {
         subtitle="Manage scholarships and run syncs from the website."
       />
       {stats && (
-        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm">
-          <span className="font-medium text-[var(--text)]">
-            <span className="text-[var(--muted)]">Total scholarships:</span> {stats.totalScholarships ?? "—"}
-          </span>
-          {stats.matchingHealth != null && (
-            <>
-              <span className="font-medium text-[var(--text)]">
-                <span className="text-[var(--muted)]">% matchable:</span> {stats.matchingHealth.matchablePercent ?? "—"}%
-              </span>
-              <span className="font-medium text-[var(--text)]">
-                <span className="text-[var(--muted)]">Avg quality score:</span> {stats.matchingHealth.averageQualityScore ?? "—"}
-              </span>
-            </>
-          )}
-          {lastSyncTime && (
-            <span className="text-[var(--muted-2)]">
-              Last sync: {lastSync?.source ?? "—"} at {lastSyncTime}
-            </span>
-          )}
-          <Link href="/app/admin/dashboard" className="text-amber-400 hover:underline text-xs font-medium">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-[var(--muted-2)]">Total scholarships</p>
+            <p className="text-xl font-bold font-heading tabular-nums mt-0.5">{stats.totalScholarships ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-[var(--muted-2)]">Verified %</p>
+            <p className="text-xl font-bold font-heading tabular-nums mt-0.5">{stats.verifiedPercent ?? "—"}%</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-[var(--muted-2)]">Matchable %</p>
+            <p className="text-xl font-bold font-heading tabular-nums mt-0.5">{stats.matchingHealth?.matchablePercent ?? "—"}%</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-[var(--muted-2)]">Last sync</p>
+            <p className="text-sm font-medium mt-0.5 truncate">{lastSyncTime ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-[var(--muted-2)]">Recent errors</p>
+            <p className="text-xl font-bold font-heading tabular-nums mt-0.5">{stats.errors?.length ?? 0}</p>
+          </div>
+        </div>
+      )}
+      {stats && (
+        <p className="text-sm">
+          <Link href="/app/admin/dashboard" className="text-amber-400 hover:underline font-medium">
             View full dashboard →
           </Link>
-        </div>
+        </p>
       )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {adminSections.map((section) => (

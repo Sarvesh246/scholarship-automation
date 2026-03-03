@@ -34,7 +34,7 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-black/50 transition-opacity md:hidden",
+          "fixed inset-0 z-40 bg-[var(--overlay)] transition-opacity md:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0"
         )}
         onClick={onClose}
@@ -52,7 +52,7 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
         <div className="flex items-center justify-between pb-6">
           <div className="flex items-center gap-2 px-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-linear-to-br from-amber-500 to-orange-600 shadow-md shrink-0">
-              <svg className="w-[18px] h-[18px] text-black translate-x-[1px]" viewBox="0 0 24 24" fill="currentColor">
+              <svg className="w-[18px] h-[18px] text-[var(--on-primary)] translate-x-[1px]" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
               </svg>
             </div>

@@ -35,7 +35,7 @@ export default function DashboardPage() {
   const { user } = useUser();
   const [applications, setApplications] = useState<Application[]>([]);
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
-  const [matchResults, setMatchResults] = useState<{ id: string; matchScore: number; eligibilityStatus: string }[]>([]);
+  const [matchResults, setMatchResults] = useState<{ id: string; matchScore: number; eligibilityStatus: string; reasons: string[] }[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Phase 1: Load applications first so the dashboard can paint quickly (especially on mobile).
@@ -67,13 +67,13 @@ export default function DashboardPage() {
       if (cancelled) return;
       const cached = getCachedMatches(user.uid);
       if (cached && cached.length === scholarships.length) {
-        setMatchResults(cached.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus })));
+        setMatchResults(cached.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus, reasons: r.reasons ?? [] })));
         return;
       }
       const runMatch = () => {
         if (cancelled) return;
         computeMatchesForUser(user.uid, profile, scholarships).then((results) => {
-          if (!cancelled) setMatchResults(results.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus })));
+          if (!cancelled) setMatchResults(results.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus, reasons: r.reasons ?? [] })));
         });
       };
       if (typeof requestIdleCallback !== "undefined") {
@@ -149,7 +149,7 @@ export default function DashboardPage() {
         if (!r) return null;
         const ok = r.eligibilityStatus === "eligible" || r.eligibilityStatus === "almost_eligible" || (r.eligibilityStatus === "may_not_be_eligible" && r.matchScore >= 50);
         if (!ok) return null;
-        return { scholarship: s, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus };
+        return { scholarship: s, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus, reasons: r.reasons ?? [] };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
     withScores.sort((a, b) => b.matchScore - a.matchScore || (new Date(a.scholarship.deadline || "").getTime() - new Date(b.scholarship.deadline || "").getTime()));
@@ -201,6 +201,10 @@ export default function DashboardPage() {
       label: "You qualify for",
       value: greenlightEligibleCount,
       sub: "scholarships",
+      zeroCopy: "No exact matches yet",
+      zeroSub: "Add location + activities to unlock more.",
+      zeroActionHref: "/app/profile",
+      zeroActionLabel: "Improve profile",
       icon: (
         <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -234,6 +238,7 @@ export default function DashboardPage() {
       label: "Estimated $ applied",
       value: `$${estimatedSum.toLocaleString()}`,
       sub: potentialEligibleSum > 0 ? `Up to $${(potentialEligibleSum / 1000).toFixed(0)}k more to discover` : null,
+      subWhenZero: estimatedSum === 0 && potentialEligibleSum > 0 ? `Potential $ eligible: $${potentialEligibleSum.toLocaleString()}` : null,
       icon: (
         <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -280,28 +285,52 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        {statCards.map((stat, i) => (
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 items-stretch">
+        {statCards.map((stat, i) => {
+          const isFirst = i === 0;
+          const isMoney = i === 3;
+          const showZeroState = isFirst && stat.value === 0 && "zeroCopy" in stat && (stat as { zeroCopy?: string }).zeroCopy;
+          return (
           <Card
             key={stat.label}
-            className={`p-4 ${i === 0 ? "ring-1 ring-emerald-500/20 bg-emerald-500/5" : ""}`}
+            className={`h-full min-h-[96px] p-3 sm:p-4 flex ${isFirst ? "ring-1 ring-emerald-500/20 bg-emerald-500/5" : ""}`}
           >
-            <div className="flex items-center gap-3">
-              <div className={`w-9 h-9 ${stat.iconBg} rounded-lg flex items-center justify-center shrink-0`}>
+            <div className="flex items-stretch gap-2 sm:gap-3 min-w-0 w-full flex-1">
+              <div className={`w-8 h-8 sm:w-9 sm:h-9 ${stat.iconBg} rounded-lg flex items-center justify-center shrink-0`}>
                 {stat.icon}
               </div>
-              <div className="min-w-0">
-                <p className="text-xs text-[var(--muted-2)]">{stat.label}</p>
-                <p className="mt-0.5 text-xl font-bold font-heading tabular-nums">
-                  {stat.value}{stat.sub === "scholarships" ? ` ${stat.sub}` : ""}
-                </p>
-                {stat.sub != null && stat.sub !== "scholarships" && (
-                  <p className="mt-0.5 text-[11px] text-[var(--muted-2)]">{stat.sub}</p>
+              <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5 py-0.5">
+                <p className="text-[11px] sm:text-xs text-[var(--muted-2)] leading-tight shrink-0">{stat.label}</p>
+                {showZeroState ? (
+                  <>
+                    <p className="text-base sm:text-lg font-bold font-heading leading-tight">{(stat as { zeroCopy: string }).zeroCopy}</p>
+                    <p className="text-[11px] text-[var(--muted-2)] leading-tight">{(stat as { zeroSub?: string }).zeroSub}</p>
+                    <Link
+                      href={(stat as { zeroActionHref?: string }).zeroActionHref ?? "/app/profile"}
+                      className="mt-1 inline-block text-xs font-medium text-emerald-400 hover:text-emerald-300 leading-tight"
+                    >
+                      {(stat as { zeroActionLabel?: string }).zeroActionLabel ?? "Improve profile"} →
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl sm:text-3xl font-bold font-heading tabular-nums leading-tight min-h-[1.75em] flex items-center flex-1">
+                      {typeof stat.value === "number" ? stat.value : stat.value}
+                      {isFirst && stat.sub === "scholarships" ? ` ${stat.sub}` : ""}
+                    </p>
+                    {isMoney && "subWhenZero" in stat && stat.subWhenZero && (
+                      <p className="text-[11px] text-emerald-400/90 leading-tight">{stat.subWhenZero}</p>
+                    )}
+                    {stat.sub != null && stat.sub !== "scholarships" && (
+                      <p className="text-[11px] text-[var(--muted-2)] leading-tight">{stat.sub}</p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {topRecommended.length > 0 && (
@@ -310,7 +339,7 @@ export default function DashboardPage() {
             Top recommended for you
           </h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {topRecommended.map(({ scholarship, matchScore }) => (
+            {topRecommended.map(({ scholarship, matchScore, reasons }) => (
               <Card key={scholarship.id} className="p-4 flex flex-col">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-medium text-[var(--text)] text-sm line-clamp-2">
@@ -320,6 +349,10 @@ export default function DashboardPage() {
                     {matchScore}%
                   </span>
                 </div>
+                <p className="mt-1 text-[11px] text-[var(--muted-2)]">
+                  {matchScore >= 70 ? "Strong match" : matchScore >= 50 ? "Good match" : "Match"}
+                  {reasons.length > 0 && ` · Based on ${reasons.slice(0, 2).join(", ")}`}
+                </p>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--muted-2)]">
                   {scholarship.deadline && (
                     <span>Due {new Date(scholarship.deadline).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>

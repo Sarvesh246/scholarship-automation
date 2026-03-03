@@ -1,10 +1,13 @@
 import type { Scholarship } from "@/types";
 import { db } from "./firebase";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { fetchScholarshipsFirstPage, fetchScholarshipById } from "./scholarshipApi";
 import { isInstitutionalGrant, isOverMaxPrize } from "./institutionalGrantFilter";
 import { MIN_SCORE_APPROVED } from "./scholarshipQuality";
+import { logFirestoreRead } from "./firestoreReadLog";
 
-let cache: Scholarship[] | null = null;
+/** Client-side cache for first page (avoids duplicate fetches in same session). */
+let firstPageCache: Scholarship[] | null = null;
 
 /** Bold.org category pages that are not real scholarships. */
 const JUNK_TITLE_PATTERN = /^By\s+(Demographics|Major|Year|State)$/i;
@@ -16,57 +19,46 @@ function isJunkScholarship(s: Scholarship): boolean {
   return false;
 }
 
-function getTodayDateString(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function isDeadlineValid(deadline: string | undefined): boolean {
-  if (!deadline || typeof deadline !== "string") return false;
-  const normalized = deadline.replace(/T.*$/, "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return false;
-  return normalized >= getTodayDateString();
-}
-
-/** Only show scholarships that passed verification (approved), or legacy records not yet validated. */
 function passesQualityGate(s: Scholarship): boolean {
   const status = s.verificationStatus;
   if (status === "approved") return true;
   if (status === "hidden" || status === "flagged" || status === "needs_review") return false;
-  if (status === undefined && s.qualityScore === undefined) return true; // legacy: show until full validation is run
+  if (status === undefined && s.qualityScore === undefined) return true;
   const score = s.qualityScore ?? 0;
   return score >= MIN_SCORE_APPROVED;
 }
 
+/**
+ * Get first page of scholarships (max 20). Uses gateway API + server cache.
+ * No direct Firestore reads from client.
+ */
 export async function getScholarships(includeDrafts = false): Promise<Scholarship[]> {
-  if (cache && !includeDrafts) return cache;
-  if (!db) return [];
+  if (typeof window === "undefined") return [];
+  if (firstPageCache && !includeDrafts) return firstPageCache;
   try {
-    const snap = await getDocs(collection(db, "scholarships"));
-    const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Scholarship);
-    const filtered = all.filter((s) => {
-      if (!isDeadlineValid(s.deadline) || isJunkScholarship(s)) return false;
-      if (isInstitutionalGrant(s)) return false;
-      if (isOverMaxPrize(s)) return false;
-      if (!includeDrafts && s.status === "draft") return false;
-      if (!passesQualityGate(s)) return false;
-      return true;
-    });
-    if (!includeDrafts) cache = filtered;
+    const items = await fetchScholarshipsFirstPage(20);
+    const filtered = includeDrafts
+      ? items
+      : items.filter((s) => {
+          if (s.status === "draft") return false;
+          return passesQualityGate(s);
+        });
+    if (!includeDrafts) firstPageCache = filtered;
     return filtered;
   } catch {
     return [];
   }
 }
 
-/** Returns all scholarships (including drafts, expired) for admin. Excludes only junk. */
+/**
+ * Admin-only: full list from Firestore (no gateway). Use sparingly.
+ * Called only from admin scholarship/bulk pages.
+ */
 export async function getScholarshipsForAdmin(): Promise<Scholarship[]> {
   if (!db) return [];
   try {
     const snap = await getDocs(collection(db, "scholarships"));
+    logFirestoreRead("getScholarshipsForAdmin (client)", snap.size);
     const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Scholarship);
     return all.filter((s) => !isJunkScholarship(s));
   } catch {
@@ -74,13 +66,16 @@ export async function getScholarshipsForAdmin(): Promise<Scholarship[]> {
   }
 }
 
-/** Fetch a single scholarship by ID (one Firestore read). Returns null if not found or junk. */
+/**
+ * Get a single scholarship by ID. Uses gateway API + server cache.
+ * No direct Firestore read from client.
+ */
 export async function getScholarship(id: string): Promise<Scholarship | null> {
-  if (!db || !id) return null;
+  if (!id) return null;
+  if (typeof window === "undefined") return null;
   try {
-    const snap = await getDoc(doc(db, "scholarships", id));
-    if (!snap.exists()) return null;
-    const s = { id: snap.id, ...snap.data() } as Scholarship;
+    const s = await fetchScholarshipById(id);
+    if (!s) return null;
     if (isJunkScholarship(s) || isInstitutionalGrant(s) || isOverMaxPrize(s)) return null;
     if (!passesQualityGate(s)) return null;
     return s;
@@ -90,5 +85,5 @@ export async function getScholarship(id: string): Promise<Scholarship | null> {
 }
 
 export function invalidateScholarshipCache() {
-  cache = null;
+  firstPageCache = null;
 }

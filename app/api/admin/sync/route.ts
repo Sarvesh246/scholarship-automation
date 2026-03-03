@@ -3,6 +3,7 @@ import { requireAdminAuth } from "@/lib/requireAdminAuth";
 import { syncFromScholarshipOwl, syncScholarshipsFromUrl, syncFromGrantsGov } from "@/lib/syncScholarships";
 import { deleteExpiredScholarships, deleteJunkScholarships } from "@/lib/scholarshipDeadline";
 import { logSync, logError } from "@/lib/adminLog";
+import { invalidateListCache } from "@/lib/scholarshipCache";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
     ]);
     results.expiredDeleted = expiredDeleted;
     results.junkDeleted = junkDeleted;
+    invalidateListCache();
   } catch (err) {
     console.error("[admin/sync] Cleanup failed", err);
   }

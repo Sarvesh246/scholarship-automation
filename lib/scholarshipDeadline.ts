@@ -28,6 +28,38 @@ export function isDeadlineValid(deadline: string | undefined): boolean {
 
 const BATCH_SIZE = 500;
 
+/** Normalize deadline from Firestore doc (string or Timestamp) to YYYY-MM-DD for comparison. */
+function normalizeDeadlineFromDoc(deadline: unknown): string | null {
+  if (typeof deadline === "string") {
+    const s = deadline.replace(/T.*$/, "").trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+  }
+  if (deadline && typeof deadline === "object" && "toDate" in deadline && typeof (deadline as { toDate: () => Date }).toDate === "function") {
+    const d = (deadline as { toDate: () => Date }).toDate();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  if (deadline && typeof deadline === "object" && "seconds" in (deadline as object)) {
+    const sec = (deadline as { seconds: number }).seconds;
+    const d = new Date(sec * 1000);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  if (deadline && typeof deadline === "object" && "_seconds" in (deadline as object)) {
+    const sec = (deadline as { _seconds: number })._seconds;
+    const d = new Date(sec * 1000);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  return null;
+}
+
 /**
  * Delete all scholarships with deadline before today from Firestore.
  * Returns the number of documents deleted.
@@ -37,17 +69,21 @@ export async function deleteExpiredScholarships(): Promise<number> {
   const col = db.collection("scholarships");
   const today = getTodayDateString();
 
-  const snap = await col.get();
+  let snap;
+  try {
+    snap = await col.get();
+  } catch (e) {
+    console.error("[deleteExpiredScholarships] col.get() failed:", e);
+    throw e;
+  }
+
   const toDelete: DocumentReference[] = [];
 
   for (const doc of snap.docs) {
     const data = doc.data();
-    const deadline = data?.deadline;
-    if (typeof deadline === "string") {
-      const normalized = deadline.replace(/T.*$/, "").trim();
-      if (normalized < today) {
-        toDelete.push(doc.ref);
-      }
+    const deadlineNorm = normalizeDeadlineFromDoc(data?.deadline);
+    if (deadlineNorm != null && deadlineNorm < today) {
+      toDelete.push(doc.ref);
     }
   }
 
@@ -55,7 +91,12 @@ export async function deleteExpiredScholarships(): Promise<number> {
     const chunk = toDelete.slice(i, i + BATCH_SIZE);
     const batch = db.batch();
     for (const ref of chunk) batch.delete(ref);
-    await batch.commit();
+    try {
+      await batch.commit();
+    } catch (e) {
+      console.error("[deleteExpiredScholarships] batch.commit() failed:", e);
+      throw e;
+    }
   }
 
   return toDelete.length;
@@ -98,11 +139,22 @@ export async function deleteJunkScholarships(): Promise<number> {
 
   for (const id of JUNK_BOLD_IDS) {
     const ref = col.doc(id);
-    const doc = await ref.get();
-    if (doc.exists) toDelete.add(ref);
+    try {
+      const doc = await ref.get();
+      if (doc.exists) toDelete.add(ref);
+    } catch (e) {
+      console.error("[deleteJunkScholarships] get doc failed:", id, e);
+    }
   }
 
-  const snap = await col.get();
+  let snap;
+  try {
+    snap = await col.get();
+  } catch (e) {
+    console.error("[deleteJunkScholarships] col.get() failed:", e);
+    throw e;
+  }
+
   for (const doc of snap.docs) {
     const title = doc.data()?.title;
     if (typeof title === "string" && JUNK_TITLE_PATTERN.test(title.trim())) {
@@ -111,12 +163,15 @@ export async function deleteJunkScholarships(): Promise<number> {
   }
 
   const refs = [...toDelete];
-  if (refs.length > 0) {
-    for (let i = 0; i < refs.length; i += BATCH_SIZE) {
-      const chunk = refs.slice(i, i + BATCH_SIZE);
-      const batch = db.batch();
-      for (const ref of chunk) batch.delete(ref);
+  for (let i = 0; i < refs.length; i += BATCH_SIZE) {
+    const chunk = refs.slice(i, i + BATCH_SIZE);
+    const batch = db.batch();
+    for (const ref of chunk) batch.delete(ref);
+    try {
       await batch.commit();
+    } catch (e) {
+      console.error("[deleteJunkScholarships] batch.commit() failed:", e);
+      throw e;
     }
   }
 

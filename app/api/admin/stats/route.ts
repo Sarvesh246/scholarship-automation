@@ -57,8 +57,10 @@ export async function GET(request: Request) {
     let missingStateCount = 0;
     let qualitySum = 0;
     let qualityCount = 0;
+    let verifiedCount = 0;
 
     for (const s of nonJunk) {
+      if (s.verificationStatus === "approved") verifiedCount++;
       const src = inferSource(String(s.id), s.source as string | undefined);
       bySource[src] = (bySource[src] ?? 0) + 1;
       for (const c of (s.categoryTags as string[]) ?? []) {
@@ -112,6 +114,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       totalScholarships: nonJunk.length,
+      verifiedPercent: totalForMatch > 0 ? Math.round((verifiedCount / totalForMatch) * 100) : 0,
       expiredCount: scholarships.length - valid.length,
       junkCount: valid.length - nonJunk.length,
       bySource,

@@ -12,6 +12,8 @@ interface Props {
   hasApplication?: boolean;
   onStartApplication?: (scholarship: Scholarship) => Promise<void>;
   matchResult?: ScholarshipMatchResult;
+  /** When true, card gets a green border glow (Greenlight mode). */
+  greenlightHighlight?: boolean;
 }
 
 export const ScholarshipRowCard = memo(function ScholarshipRowCard({
@@ -19,6 +21,7 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
   hasApplication = false,
   onStartApplication,
   matchResult,
+  greenlightHighlight = false,
 }: Props) {
   const [starting, setStarting] = useState(false);
   const router = useRouter();
@@ -47,9 +50,9 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
 
   return (
     <div
-      className={`flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 text-sm shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-500/25 hover:shadow-md ${
-        isExpired ? "opacity-60" : ""
-      }`}
+      className={`flex items-center gap-4 rounded-2xl border px-5 py-4 text-sm shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
+        greenlightHighlight ? "border-emerald-500/40 bg-emerald-500/5 shadow-emerald-500/10 shadow-lg" : "border-[var(--border)] bg-[var(--surface)] hover:border-amber-500/25"
+      } ${isExpired ? "opacity-60" : ""}`}
     >
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -90,17 +93,12 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
         <p className="text-xs text-[var(--muted-2)]">
           {decodeHtmlEntities(scholarship.sponsor)}
         </p>
-        {matchResult && matchResult.reasons.length > 0 && (
-          <p className="text-[11px] text-emerald-400/90">
-            Why: {matchResult.reasons.slice(0, 4).join(", ")}
-          </p>
-        )}
-        <div className="mt-1 flex flex-wrap items-center gap-4 text-xs">
+        <div className="flex items-center gap-4 flex-wrap text-xs mt-1">
           <span className="flex items-center gap-1.5">
             <span className="text-[var(--muted-2)]" title="Award amount">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </span>
-            <span className={`font-semibold ${(scholarship.amount ?? 0) > 0 ? "text-emerald-500 dark:text-emerald-400" : "text-[var(--muted)]"}`}>
+            <span className={`font-semibold ${(scholarship.amount ?? 0) > 0 ? "text-emerald-500 dark:text-emerald-400 text-base" : "text-[var(--muted)]"}`}>
               {(scholarship.amount ?? 0) > 0 ? `$${(scholarship.amount ?? 0).toLocaleString()}` : "Varies"}
             </span>
           </span>
@@ -108,8 +106,13 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             {scholarship.estimatedTime ?? "—"}
           </span>
-          <span className="text-[var(--muted-2)]">Deadline: {deadline}</span>
+          <span className="text-[var(--muted-2)]">📅 {deadline}</span>
         </div>
+        {matchResult && matchResult.reasons.length > 0 && (
+          <p className="text-[11px] text-emerald-400/90 mt-0.5">
+            Matched because: {matchResult.reasons.slice(0, 4).join(", ")}
+          </p>
+        )}
         <div className="mt-2 flex flex-wrap gap-1.5">
           {(scholarship.normalized?.requirements ?? []).slice(0, 4).map((req) => (
             <Tag key={req}>{req}</Tag>

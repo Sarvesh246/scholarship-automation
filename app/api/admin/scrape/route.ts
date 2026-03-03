@@ -3,9 +3,15 @@ import { requireAdminAuth } from "@/lib/requireAdminAuth";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
 import { mapExternalToScholarship, type ExternalScholarshipItem } from "@/lib/syncScholarships";
 import { enrichWithClassification } from "@/lib/classifyScholarship";
+import { runQualityVerification } from "@/lib/scholarshipQuality";
+import { normalizeScholarship } from "@/lib/normalizeScholarship";
+import { isOverMaxPrize } from "@/lib/institutionalGrantFilter";
 import { runAllScrapers, SCRAPERS, type ScraperId } from "@/lib/scrapers";
+import { SCRAPER_SOURCE_TYPES } from "@/lib/scrapers/sourceRegistry";
+import type { SourceType } from "@/types";
 import { isDeadlineValid, deleteExpiredScholarships, deleteJunkScholarships } from "@/lib/scholarshipDeadline";
 import { logSync, logError } from "@/lib/adminLog";
+import { invalidateListCache } from "@/lib/scholarshipCache";
 
 export const dynamic = "force-dynamic";
 
@@ -44,41 +50,54 @@ export async function POST(request: NextRequest) {
 
     for (const { id, items: itemsList } of scraped) {
       const valid = itemsList.filter((item) => isDeadlineValid(typeof item.deadline === "string" ? item.deadline : undefined));
+      const defaultSourceType = SCRAPER_SOURCE_TYPES[id] as SourceType | undefined;
       const toWrite = valid.map((item) => {
         const scholarship = enrichWithClassification(mapExternalToScholarship(item));
-        scholarship.source = id as "bold" | "collegescholarships" | "scholarshipscom" | "scholarships360" | "collegedata";
+        scholarship.source = id;
+        if (!scholarship.sourceType && defaultSourceType) scholarship.sourceType = defaultSourceType;
+        if (item.sourceType && typeof item.sourceType === "string") scholarship.sourceType = item.sourceType as SourceType;
+        if (isOverMaxPrize(scholarship)) return null;
+        const q = runQualityVerification(scholarship);
+        const withQuality = { ...scholarship, ...q };
+        const normalized = normalizeScholarship(withQuality);
         const docId = item.id && typeof item.id === "string" ? item.id : scholarship.id;
-        return { scholarship, docId };
-      });
-      let created = 0;
-      let updated = 0;
+        return {
+          scholarship: {
+            ...scholarship,
+            qualityScore: q.qualityScore,
+            verificationStatus: q.verificationStatus,
+            domainTrustScore: q.domainTrustScore,
+            displayCategory: q.displayCategory,
+            lastVerifiedAt: q.lastVerifiedAt,
+            normalized,
+          },
+          docId,
+        };
+      }).filter((x): x is NonNullable<typeof x> => x != null);
+      let written = 0;
       const BATCH_SIZE = 500;
       for (let i = 0; i < toWrite.length; i += BATCH_SIZE) {
         const chunk = toWrite.slice(i, i + BATCH_SIZE);
-        const refs = chunk.map(({ docId }) => col.doc(docId));
-        const existing = await Promise.all(refs.map((r) => r.get()));
         const batch = db.batch();
         for (let j = 0; j < chunk.length; j++) {
           const { scholarship, docId } = chunk[j];
+          const ref = col.doc(docId);
           const { id: _id, ...data } = scholarship;
-          if (existing[j].exists) {
-            batch.update(refs[j], data);
-            updated++;
-          } else {
-            batch.set(refs[j], { id: docId, ...data });
-            created++;
-          }
+          batch.set(ref, { id: docId, ...data }, { merge: true });
+          written++;
         }
         await batch.commit();
       }
-      results[id] = { created, updated, total: itemsList.length, skipped: itemsList.length - valid.length };
-      logSync(`scrape:${id}`, created, updated).catch(() => {});
+      results[id] = { created: 0, updated: written, total: itemsList.length, skipped: itemsList.length - valid.length };
+      logSync(`scrape:${id}`, 0, written).catch(() => {});
     }
 
     const [expiredDeleted, junkDeleted] = await Promise.all([
       deleteExpiredScholarships(),
       deleteJunkScholarships(),
     ]);
+
+    invalidateListCache();
 
     return NextResponse.json({ ok: true, results, expiredDeleted, junkDeleted });
   } catch (err) {

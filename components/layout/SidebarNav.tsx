@@ -46,7 +46,7 @@ export function SidebarNav() {
     <aside className="hidden h-screen w-64 shrink-0 border-r border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-4 md:flex md:flex-col">
       <div className="flex items-center gap-2 px-2 pb-6">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-linear-to-br from-amber-500 to-orange-600 shadow-md shrink-0">
-          <svg className="w-[18px] h-[18px] text-black translate-x-[1px]" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="w-[18px] h-[18px] text-[var(--on-primary)] translate-x-[1px]" viewBox="0 0 24 24" fill="currentColor">
             <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
           </svg>
         </div>
@@ -121,7 +121,7 @@ export function SidebarNav() {
           Upgrade (soon)
         </button>
         <div className="flex items-center gap-2 rounded-lg px-2 py-1.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-linear-to-br from-amber-400 to-orange-500 text-[10px] font-bold text-black shrink-0">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-linear-to-br from-amber-400 to-orange-500 text-[10px] font-bold text-[var(--on-primary)] shrink-0">
             {initials}
           </div>
           <div className="flex flex-col min-w-0">

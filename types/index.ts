@@ -5,6 +5,25 @@ export type ScholarshipCategory =
   | "Leadership"
   | "FinancialNeed";
 
+/** Inventory/source type for filtering and display (beyond aggregators). */
+export type SourceType =
+  | "aggregator"
+  | "institutional_departmental"
+  | "professional_association"
+  | "corporate_foundation"
+  | "municipal"
+  | "community_foundation"
+  | "research_fellowship"
+  | "arts"
+  | "civic"
+  | "healthcare"
+  | "industry_specific"
+  | "sports"
+  | "faith_based"
+  | "local_business"
+  | "union"
+  | "recurring_pending_update";
+
 export type ApplicationStatus =
   | "not_started"
   | "drafting"
@@ -22,8 +41,10 @@ export interface Scholarship {
   estimatedTime: string;
   description: string;
   prompts: string[];
-  /** When synced from external source: scholarship_owl, grants_gov, or scraper id. */
-  source?: "scholarship_owl" | "grants_gov" | "bold" | "collegescholarships" | "scholarshipscom" | "scholarships360" | "collegedata";
+  /** When synced from external source: scholarship_owl, grants_gov, or scraper id (e.g. bold, collegescholarships, professional_associations). */
+  source?: string;
+  /** Inventory category for display/filter: institutional, professional association, municipal, etc. */
+  sourceType?: SourceType;
   /** If true, show in featured section on Scholarships page. */
   featured?: boolean;
   /** draft = hidden from users, published = visible (default). */
@@ -98,6 +119,8 @@ export interface NormalizedScholarship {
   qualityScore: number;
   lastVerifiedAt: string | null;
   source: string;
+  /** Same as Scholarship.sourceType for filtering. */
+  sourceType?: SourceType;
   matchable: boolean;
 }
 
@@ -211,5 +234,26 @@ export interface ScholarshipMatchResult {
   failedCriteria?: string[];
   /** Human-readable reason for "Almost Eligible" e.g. "Requires 3.5 GPA (you have 3.4)". */
   almostEligibleReason?: string;
+}
+
+/** User-submitted scholarship for moderation queue. */
+export interface ScholarshipSubmission {
+  id: string;
+  title: string;
+  sponsor: string;
+  amount?: number;
+  deadline?: string;
+  description?: string;
+  applicationUrl?: string | null;
+  /** Submitter user id. */
+  submittedBy: string;
+  submittedByEmail?: string;
+  status: "pending" | "approved" | "rejected";
+  submittedAt: string | { _seconds: number };
+  reviewedAt?: string | { _seconds: number };
+  /** Set when approved: id of created scholarship. */
+  scholarshipId?: string | null;
+  /** Optional reason when rejected. */
+  rejectedReason?: string | null;
 }
 

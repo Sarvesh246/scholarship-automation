@@ -20,7 +20,7 @@ export function Drawer({ open, title, onClose, children }: DrawerProps) {
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-40 flex justify-end bg-black/50"
+      className="fixed inset-0 z-40 flex justify-end bg-[var(--overlay)]"
       role="dialog"
       aria-modal="true"
       aria-label={title}

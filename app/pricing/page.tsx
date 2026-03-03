@@ -10,7 +10,7 @@ export default function PricingPage() {
         <header className="flex items-center justify-between gap-4 pb-10">
           <Link href="/" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-amber-500 to-orange-600 shadow-md">
-              <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="currentColor">
+              <svg className="w-4 h-4 text-[var(--on-primary)]" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
               </svg>
             </div>

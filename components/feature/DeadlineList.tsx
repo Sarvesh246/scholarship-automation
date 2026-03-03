@@ -36,7 +36,9 @@ export function DeadlineList({ groups, onResume }: DeadlineListProps) {
           <div className="space-y-2 rounded-xl bg-[var(--bg-secondary)] p-2">
             {group.items.length === 0 && (
               <p className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-2 py-2 text-[10px] text-[var(--muted-2)]">
-                Nothing urgent in this window.
+                {group.label === "This week"
+                  ? "You're ahead. No deadlines this week."
+                  : "Nothing urgent in this window."}
               </p>
             )}
             {group.items.map((item) => {

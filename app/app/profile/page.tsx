@@ -185,16 +185,18 @@ export default function ProfilePage() {
           <p className="text-amber-400">{completion}%</p>
         </div>
         <ProgressBar value={completion} />
-        {missingCount > 0 && (
+        {missingCount > 0 ? (
           <p className="text-[11px] text-[var(--muted-2)]">
-            Add {missingCount} more to unlock more matches: {suggestions.join(", ")}
+            Completing your profile increases match accuracy. Add {missingCount} more: {suggestions.join(", ")}
           </p>
+        ) : (
+          <p className="text-[11px] text-emerald-400/90">Profile complete — you get the best match accuracy.</p>
         )}
       </Card>
 
       <Card className="space-y-3 p-4">
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-br from-amber-400 to-orange-500 text-lg font-bold text-black shrink-0">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-br from-amber-400 to-orange-500 text-lg font-bold text-[var(--on-primary)] shrink-0">
             {initials}
           </div>
           <div className="flex-1 space-y-2">

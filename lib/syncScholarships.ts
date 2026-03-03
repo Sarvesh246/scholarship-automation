@@ -1,5 +1,4 @@
-import type { Scholarship } from "@/types";
-import type { ScholarshipCategory } from "@/types";
+import type { Scholarship, ScholarshipCategory, SourceType } from "@/types";
 import { getAdminFirestore } from "./firebaseAdmin";
 import { isDeadlineValid } from "./scholarshipDeadline";
 import { enrichWithClassification } from "./classifyScholarship";
@@ -33,6 +32,8 @@ export interface ExternalScholarshipItem {
   essay_prompts?: string[];
   docsRequired?: string[];
   docs_required?: string[];
+  /** Set by scrapers for inventory type (e.g. institutional_departmental, professional_association). */
+  sourceType?: SourceType | string;
   [key: string]: unknown;
 }
 
@@ -173,6 +174,16 @@ export function mapExternalToScholarship(item: ExternalScholarshipItem): Scholar
     description: desc || undefined,
   });
 
+  const VALID_SOURCE_TYPES: SourceType[] = [
+    "aggregator", "institutional_departmental", "professional_association", "corporate_foundation",
+    "municipal", "community_foundation", "research_fellowship", "arts", "civic", "healthcare",
+    "industry_specific", "sports", "faith_based", "local_business", "union", "recurring_pending_update",
+  ];
+  const sourceType =
+    typeof item.sourceType === "string" && VALID_SOURCE_TYPES.includes(item.sourceType as SourceType)
+      ? (item.sourceType as SourceType)
+      : undefined;
+
   return {
     id,
     title,
@@ -185,7 +196,8 @@ export function mapExternalToScholarship(item: ExternalScholarshipItem): Scholar
     description: typeof item.description === "string" && item.description.trim()
       ? item.description.trim()
       : `${title} from ${sponsor}.`,
-    prompts: prompts.length > 0 ? prompts : []
+    prompts: prompts.length > 0 ? prompts : [],
+    ...(sourceType && { sourceType }),
   };
 }
 

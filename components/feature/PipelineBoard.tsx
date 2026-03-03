@@ -88,8 +88,8 @@ const ApplicationCard = memo(function ApplicationCard({
       </div>
       <div className="mt-1">
         <ProgressBar value={card.progress} />
-        <p className="mt-1 text-[10px] text-[var(--muted-2)]">
-          Next: {card.nextTask}
+        <p className="mt-1 text-[10px] font-semibold text-[var(--text)]">
+          Next step: {card.nextTask.replace(/^Review requirements and prompts$/i, "Review requirements").replace(/^Next:?\s*/i, "")}
         </p>
       </div>
     </>
@@ -141,12 +141,13 @@ export function PipelineBoard({ applications, getCardHref, onDelete }: PipelineB
 
   return (
     <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-      {COLUMNS.map((column) => {
+      {COLUMNS.map((column, idx) => {
         const columnApps = byStatus.get(column.status) ?? [];
+        const colBg = idx % 2 === 0 ? "bg-[var(--surface)]" : "bg-[var(--surface-2)]";
         return (
         <div
           key={column.status}
-          className="flex flex-col gap-3 rounded-xl bg-[var(--bg-secondary)] p-3 min-w-0"
+          className={cn("flex flex-col gap-3 rounded-xl p-3 min-w-0", colBg)}
         >
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium text-[var(--muted)]">
