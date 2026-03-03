@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { getProfileFieldValues } from "@/lib/eligibility";
-import { decodeHtmlEntities } from "@/lib/utils";
+import { decodeHtmlEntities, displayScholarshipTitle } from "@/lib/utils";
 import { ensureApplication, updateApplicationOwlStatus } from "@/lib/applicationStorage";
 import { getIdToken } from "@/hooks/useAdmin";
 import { useUser } from "@/hooks/useUser";
@@ -202,7 +202,7 @@ export function ApplyToOwlModal({
       >
         <div className="shrink-0 border-b border-[var(--border)] px-6 py-4">
           <h2 className="text-sm font-semibold font-heading">Apply with ScholarshipOwl</h2>
-          <p className="mt-1 text-xs text-[var(--muted)]">{decodeHtmlEntities(scholarship.title)}</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">{displayScholarshipTitle(scholarship.title)}</p>
         </div>
         <form
           id="apply-owl-form"

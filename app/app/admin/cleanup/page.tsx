@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useAdmin, getIdToken } from "@/hooks/useAdmin";
-import { decodeHtmlEntities } from "@/lib/utils";
+import { decodeHtmlEntities, displayScholarshipTitle } from "@/lib/utils";
 
 type FilteredGrant = { id: string; title: string; amount?: number; reason: string };
 
@@ -151,7 +151,7 @@ export default function AdminCleanupPage() {
           <ul className="mt-3 max-h-48 overflow-y-auto space-y-1 text-xs">
             {junkPreview.map((item) => (
               <li key={item.id} className="flex justify-between gap-2">
-                <span className="truncate">{decodeHtmlEntities(item.title)}</span>
+                <span className="truncate">{displayScholarshipTitle(item.title)}</span>
                 <span className="text-[var(--muted-2)] shrink-0">{item.id}</span>
               </li>
             ))}
@@ -183,7 +183,7 @@ export default function AdminCleanupPage() {
           <ul className="mt-3 max-h-48 overflow-y-auto space-y-1.5 text-xs">
             {filteredPreview.slice(0, 50).map((item) => (
               <li key={item.id} className="flex justify-between gap-2">
-                <span className="truncate min-w-0">{decodeHtmlEntities(item.title)}</span>
+                <span className="truncate min-w-0">{displayScholarshipTitle(item.title)}</span>
                 <span className="text-[var(--muted-2)] shrink-0">
                   {item.amount != null ? `$${item.amount.toLocaleString()}` : ""} · {item.reason}
                 </span>

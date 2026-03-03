@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore, getAdminAuth } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { formatScholarshipDescription } from "@/lib/formatScholarshipDescription";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
     const sponsor = String(body.sponsor ?? "").trim();
     const amount = typeof body.amount === "number" && body.amount >= 0 ? body.amount : undefined;
     const deadline = typeof body.deadline === "string" ? body.deadline.trim() : undefined;
-    const description = typeof body.description === "string" ? body.description.trim() : undefined;
+    const description = typeof body.description === "string" ? formatScholarshipDescription(body.description.trim()) : undefined;
     const applicationUrl = typeof body.applicationUrl === "string" ? body.applicationUrl.trim() || null : null;
 
     if (!title || title.length < 3) {

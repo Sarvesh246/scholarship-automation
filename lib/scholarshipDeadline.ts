@@ -4,7 +4,7 @@
  */
 import type { DocumentReference } from "firebase-admin/firestore";
 import { getAdminFirestore } from "./firebaseAdmin";
-import { isInstitutionalGrant, isOverMaxPrize } from "./institutionalGrantFilter";
+import { isInstitutionalGrant } from "./institutionalGrantFilter";
 
 /** Today's date as YYYY-MM-DD (UTC). */
 export function getTodayDateString(): string {
@@ -181,7 +181,7 @@ export async function deleteJunkScholarships(): Promise<number> {
 /** Scholarship-like shape from Firestore doc for filtering. */
 type DocLike = { id: string; title?: string; amount?: number; source?: string };
 
-/** Get list of scholarships that would be removed by "filtered grants" cleanup (institutional + over max prize). */
+/** Get list of scholarships that would be removed by "filtered grants" cleanup (institutional). */
 export async function getFilteredGrantsPreview(): Promise<{ id: string; title: string; amount?: number; reason: string }[]> {
   const db = getAdminFirestore();
   const col = db.collection("scholarships");
@@ -192,9 +192,8 @@ export async function getFilteredGrantsPreview(): Promise<{ id: string; title: s
     const data = doc.data();
     const s: DocLike = { id: doc.id, title: data?.title, amount: data?.amount, source: data?.source };
     const institutional = isInstitutionalGrant(s);
-    const overMax = isOverMaxPrize(s);
-    if (institutional || overMax) {
-      const reason = institutional && overMax ? "Institutional & over $150k" : institutional ? "Institutional grant" : "Over $150k";
+    if (institutional) {
+      const reason = "Institutional grant";
       result.push({
         id: doc.id,
         title: (data?.title as string) ?? doc.id,
@@ -219,7 +218,7 @@ export async function deleteFilteredGrants(): Promise<number> {
   for (const doc of snap.docs) {
     const data = doc.data();
     const s: DocLike = { id: doc.id, title: data?.title, amount: data?.amount, source: data?.source };
-    if (isInstitutionalGrant(s) || isOverMaxPrize(s)) toDelete.push(doc.ref);
+    if (isInstitutionalGrant(s)) toDelete.push(doc.ref);
   }
 
   for (let i = 0; i < toDelete.length; i += BATCH_SIZE) {

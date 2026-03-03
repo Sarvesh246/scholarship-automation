@@ -17,9 +17,9 @@ const baseClasses =
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    "bg-linear-to-r from-amber-600 to-amber-500 text-[var(--on-primary)] shadow-sm hover:shadow-[0_10px_30px_rgba(217,119,6,0.3)] hover:-translate-y-0.5",
+    "bg-[var(--primary)] text-[var(--on-primary)] shadow-sm hover:bg-[var(--primary-hover)] hover:shadow-[0_10px_30px_rgba(217,119,6,0.25)] hover:-translate-y-0.5",
   secondary:
-    "border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-amber-500/50 hover:bg-amber-500/5",
+    "border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[var(--primary)]/50 hover:bg-[var(--primary-soft)]",
   ghost:
     "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
   destructive:

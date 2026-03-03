@@ -47,7 +47,7 @@ export default function SubmitScholarshipPage() {
       }
       showToast({
         title: "Submitted",
-        message: "Thanks! Your submission is in the moderation queue. We’ll review it soon.",
+        message: "Your scholarship has been submitted and is in our review queue.",
         variant: "success",
       });
       setTitle("");
@@ -64,8 +64,8 @@ export default function SubmitScholarshipPage() {
   return (
     <div className="space-y-6 max-w-xl">
       <PageHeader
-        title="Submit a scholarship"
-        subtitle="Suggest a scholarship for the catalog. Submissions go to our moderation queue and will be reviewed before publishing."
+        title="Add your scholarship"
+        subtitle="For organizations and sponsors: submit your scholarship to our catalog. Submissions are reviewed before publishing."
       />
 
       <Card className="p-4 sm:p-6">

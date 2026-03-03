@@ -202,3 +202,17 @@ export async function updateApplicationOwlStatus(
     if (isDev) console.error("[applicationStorage] updateApplicationOwlStatus failed:", err);
   }
 }
+
+export async function updateApplicationOutcome(
+  id: string,
+  outcome: "awaiting" | "won" | "rejected"
+): Promise<void> {
+  const uid = auth?.currentUser?.uid;
+  if (!db || !uid) return;
+  try {
+    const ref = doc(db, "users", uid, "applications", id);
+    await updateDoc(ref, { outcome });
+  } catch (err) {
+    if (isDev) console.error("[applicationStorage] updateApplicationOutcome failed:", err);
+  }
+}

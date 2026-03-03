@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/requireAdminAuth";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
-import { runQualityVerification } from "@/lib/scholarshipQuality";
+import { runQualityVerification, MIN_SCORE_REVIEW } from "@/lib/scholarshipQuality";
+import { formatScholarshipDescription } from "@/lib/formatScholarshipDescription";
 import { normalizeScholarship } from "@/lib/normalizeScholarship";
 import { getTodayDateString } from "@/lib/scholarshipDeadline";
 import type { Scholarship } from "@/types";
@@ -29,6 +30,7 @@ export async function POST(request: NextRequest) {
     let updated = 0;
     let hidden = 0;
     let expiredRemoved = 0;
+    let lowQualityDeleted = 0;
     const errors: string[] = [];
 
     // Separate expired (to delete) from current (to validate)
@@ -82,24 +84,41 @@ export async function POST(request: NextRequest) {
           };
 
           const result = runQualityVerification(s);
+
+          // Hard-delete very low quality scholarships (score < MIN_SCORE_REVIEW)
+          if (result.qualityScore < MIN_SCORE_REVIEW) {
+            batch.delete(doc.ref);
+            lowQualityDeleted++;
+            continue;
+          }
+
           if (result.shouldHide) hidden++;
 
+          const formattedDescription = formatScholarshipDescription(s.description);
           const withQuality = {
             ...s,
+            description: formattedDescription,
             qualityScore: result.qualityScore,
             verificationStatus: result.verificationStatus,
             domainTrustScore: result.domainTrustScore,
             displayCategory: result.displayCategory,
             lastVerifiedAt: result.lastVerifiedAt,
+            fundingType: result.fundingType,
+            scholarshipScore: result.scholarshipScore,
           };
           const normalized = normalizeScholarship(withQuality);
 
           batch.update(doc.ref, {
+            description: formattedDescription,
             qualityScore: result.qualityScore,
             verificationStatus: result.verificationStatus,
             domainTrustScore: result.domainTrustScore,
             displayCategory: result.displayCategory,
             lastVerifiedAt: result.lastVerifiedAt,
+            riskFlags: result.riskFlags,
+            qualityTier: result.qualityTier,
+            fundingType: result.fundingType,
+            scholarshipScore: result.scholarshipScore,
             normalized,
           });
           updated++;
@@ -116,6 +135,7 @@ export async function POST(request: NextRequest) {
       ok: true,
       totalProcessed: updated,
       expiredRemoved,
+      lowQualityDeleted,
       hiddenCount: hidden,
       errors: errors.slice(0, 50),
     });

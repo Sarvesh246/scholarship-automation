@@ -55,10 +55,14 @@ export async function searchGrants(params: {
   return res.json();
 }
 
-/** Fetch opportunity details including award ceiling/floor. */
+/** Fetch opportunity details including award ceiling/floor and eligibility/funding instrument. */
 export async function fetchOpportunityDetails(opportunityId: string): Promise<{
   awardCeiling?: number;
   awardFloor?: number;
+  /** If present, reject "Cooperative Agreement" for main feed. */
+  fundingInstrumentTypes?: string[];
+  /** If present, keep only when "Individual" (or similar) is included. */
+  eligibilityCategories?: string[];
 } | null> {
   const id = parseInt(opportunityId, 10);
   if (!Number.isFinite(id)) return null;
@@ -82,10 +86,33 @@ export async function fetchOpportunityDetails(opportunityId: string): Promise<{
     };
     const ceiling = parseVal(synopsis.awardCeiling ?? synopsis.awardCeilingFormatted);
     const floor = parseVal(synopsis.awardFloor ?? synopsis.awardFloorFormatted);
-    if (ceiling === undefined && floor === undefined) return null;
+
+    const fundingInstruments: string[] = [];
+    const rawInstruments = data?.data?.fundingInstruments ?? synopsis?.fundingInstruments ?? [];
+    if (Array.isArray(rawInstruments)) {
+      for (const fi of rawInstruments) {
+        const desc = typeof fi === "string" ? fi : fi?.description ?? fi?.id ?? "";
+        if (desc) fundingInstruments.push(String(desc));
+      }
+    }
+
+    const eligibilityCategories: string[] = [];
+    const rawElig = data?.data?.applicantTypes ?? data?.data?.eligibility ?? synopsis?.applicantTypes ?? synopsis?.eligibility ?? [];
+    if (Array.isArray(rawElig)) {
+      for (const e of rawElig) {
+        const desc = typeof e === "string" ? e : e?.description ?? e?.category ?? e?.name ?? "";
+        if (desc) eligibilityCategories.push(String(desc));
+      }
+    } else if (rawElig && typeof rawElig === "object" && !Array.isArray(rawElig)) {
+      const desc = (rawElig as { description?: string }).description ?? (rawElig as { category?: string }).category;
+      if (desc) eligibilityCategories.push(String(desc));
+    }
+
     return {
       awardCeiling: ceiling,
       awardFloor: floor,
+      fundingInstrumentTypes: fundingInstruments.length > 0 ? fundingInstruments : undefined,
+      eligibilityCategories: eligibilityCategories.length > 0 ? eligibilityCategories : undefined,
     };
   } catch {
     return null;

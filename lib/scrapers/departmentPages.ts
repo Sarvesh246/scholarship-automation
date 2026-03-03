@@ -1,6 +1,6 @@
 /**
  * Scrape university department-level scholarship pages.
- * Strategy: known department scholarship listing URLs.
+ * Strategy: known department scholarship listing URLs. Scrapes every URL in the list.
  * Tag: institutional_departmental
  */
 import { scrapeSeedUrls, type SeedUrlConfig } from "./seedUrlScraper";
@@ -14,9 +14,8 @@ const DEPARTMENT_SEED_URLS: SeedUrlConfig[] = [
   { url: "https://www.ucf.edu/financial-aid/types/scholarships/", sponsor: "UCF - Financial Aid" },
 ];
 
-export async function scrapeDepartmentPages(maxPages = 5): Promise<ScrapedScholarship[]> {
-  const urls = DEPARTMENT_SEED_URLS.slice(0, Math.min(maxPages, DEPARTMENT_SEED_URLS.length));
-  return scrapeSeedUrls(urls, {
+export async function scrapeDepartmentPages(_maxPages = 5): Promise<ScrapedScholarship[]> {
+  return scrapeSeedUrls(DEPARTMENT_SEED_URLS, {
     sourceType: "institutional_departmental",
     idPrefix: "dept",
     maxPerPage: 25,

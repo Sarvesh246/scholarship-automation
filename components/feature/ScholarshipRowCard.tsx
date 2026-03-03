@@ -3,17 +3,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Scholarship, ScholarshipMatchResult } from "@/types";
 import { Tag } from "@/components/ui/Tag";
-import { formatCategoryDisplay, decodeHtmlEntities } from "@/lib/utils";
+import { formatCategoryDisplay, decodeHtmlEntities, displayScholarshipTitle } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { getQualityTier, getQualityWarnings } from "@/lib/scholarshipQuality";
+import { QualityScoreBadge } from "@/components/ui/QualityScoreBadge";
+import { getEffortTier, isStale } from "@/lib/opportunityScore";
 
 interface Props {
   scholarship: Scholarship;
   hasApplication?: boolean;
-  onStartApplication?: (scholarship: Scholarship) => Promise<void>;
+  onStartApplication?: (scholarship: Scholarship) => void | Promise<void>;
   matchResult?: ScholarshipMatchResult;
   /** When true, card gets a green border glow (Greenlight mode). */
   greenlightHighlight?: boolean;
+  /** When true, show "High ROI" opportunity badge. */
+  showHighROI?: boolean;
 }
 
 export const ScholarshipRowCard = memo(function ScholarshipRowCard({
@@ -22,6 +27,7 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
   onStartApplication,
   matchResult,
   greenlightHighlight = false,
+  showHighROI = false,
 }: Props) {
   const [starting, setStarting] = useState(false);
   const router = useRouter();
@@ -34,6 +40,10 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
   const nextStart = scholarship.nextStart
     ? new Date(scholarship.nextStart).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
     : null;
+  const qualityTier = scholarship.qualityTier ?? getQualityTier(scholarship.qualityScore);
+  const warnings = getQualityWarnings(scholarship);
+  const effortTier = getEffortTier(scholarship.estimatedTime);
+  const stale = isStale(scholarship);
 
   const handleStart = useCallback(() => {
     if (hasApplication) {
@@ -60,11 +70,24 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
             href={`/app/scholarships/${scholarship.id}`}
             className="font-semibold hover:text-amber-400 transition-colors"
           >
-            {decodeHtmlEntities(scholarship.title)}
+            {displayScholarshipTitle(scholarship.title)}
           </Link>
           {scholarship.verificationStatus === "approved" && (
             <span title="Screened by our quality checks">
               <Badge variant="success">Verified</Badge>
+            </span>
+          )}
+          {(scholarship.qualityScore ?? 0) > 0 && (
+            <QualityScoreBadge scholarship={scholarship} compact className="shrink-0" />
+          )}
+          {qualityTier === "medium" && (scholarship.qualityScore ?? 0) <= 0 && (
+            <span title={warnings.length ? warnings.join(" · ") : "Moderate quality"}>
+              <Badge variant="info" className="cursor-help">Quality</Badge>
+            </span>
+          )}
+          {qualityTier === "low" && scholarship.verificationStatus !== "approved" && (
+            <span title={warnings.length ? warnings.join(" · ") : "Lower quality"}>
+              <Badge variant="warning" className="cursor-help">Lower quality</Badge>
             </span>
           )}
           {matchResult && matchResult.eligibilityStatus === "eligible" && (
@@ -77,6 +100,9 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
           )}
           {scholarship.featured && (
             <Badge variant="success">Featured</Badge>
+          )}
+          {showHighROI && (
+            <Badge variant="success" title="High opportunity value per hour">High ROI</Badge>
           )}
           {scholarship.displayCategory === "sweepstakes" && (
             <Badge variant="info">Sweepstakes</Badge>
@@ -105,8 +131,16 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
           <span className="flex items-center gap-1.5 text-[var(--muted)]">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             {scholarship.estimatedTime ?? "—"}
+            {effortTier && (
+              <span className="text-[10px] text-[var(--muted-2)]">
+                · {effortTier === "easy" ? "Easy" : effortTier === "medium" ? "Medium" : "Heavy"}
+              </span>
+            )}
           </span>
           <span className="text-[var(--muted-2)]">📅 {deadline}</span>
+          {stale && (
+            <span className="text-[10px] text-amber-500/90" title="Listing not recently updated">Stale</span>
+          )}
         </div>
         {matchResult && matchResult.reasons.length > 0 && (
           <p className="text-[11px] text-emerald-400/90 mt-0.5">

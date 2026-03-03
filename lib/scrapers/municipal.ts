@@ -1,6 +1,6 @@
 /**
  * Scrape municipal / city-level scholarship and youth grant pages.
- * Tag: municipal
+ * Scrapes every URL in the list. Tag: municipal
  */
 import { scrapeSeedUrls, type SeedUrlConfig } from "./seedUrlScraper";
 import type { ScrapedScholarship } from "./types";
@@ -13,9 +13,8 @@ const MUNICIPAL_SEED_URLS: SeedUrlConfig[] = [
   { url: "https://www.phoenix.gov/youth/scholarships", sponsor: "City of Phoenix" },
 ];
 
-export async function scrapeMunicipal(maxPages = 5): Promise<ScrapedScholarship[]> {
-  const urls = MUNICIPAL_SEED_URLS.slice(0, Math.min(maxPages, MUNICIPAL_SEED_URLS.length));
-  return scrapeSeedUrls(urls, {
+export async function scrapeMunicipal(_maxPages = 5): Promise<ScrapedScholarship[]> {
+  return scrapeSeedUrls(MUNICIPAL_SEED_URLS, {
     sourceType: "municipal",
     idPrefix: "municipal",
     maxPerPage: 15,

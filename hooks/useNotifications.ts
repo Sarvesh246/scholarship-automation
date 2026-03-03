@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getApplications } from "@/lib/applicationStorage";
 import { getScholarships } from "@/lib/scholarshipStorage";
+import { displayScholarshipTitle } from "@/lib/utils";
 
 export type NotificationType = "deadline_urgent" | "deadline_soon" | "needs_attention";
 
@@ -48,7 +49,7 @@ export function useNotifications() {
               const msg = daysLeft <= 0 ? "Due today" : daysLeft === 1 ? "Due tomorrow" : `${daysLeft} days left`;
               notifications.push({
                 id: `urgent-${app.id}`,
-                title: s.title,
+                title: displayScholarshipTitle(s.title),
                 message: `Deadline approaching: ${msg}`,
                 href,
                 time: s.deadline,
@@ -59,7 +60,7 @@ export function useNotifications() {
             if (daysLeft <= SOON_DAYS) {
               notifications.push({
                 id: `soon-${app.id}`,
-                title: s.title,
+                title: displayScholarshipTitle(s.title),
                 message: `Deadline in ${daysLeft} days — finish your application`,
                 href,
                 time: s.deadline,
@@ -77,7 +78,7 @@ export function useNotifications() {
         if (daysSinceViewed !== null && daysSinceViewed >= STALE_DAYS) {
           notifications.push({
             id: `stale-${app.id}`,
-            title: s.title,
+            title: displayScholarshipTitle(s.title),
             message: `You haven't worked on this in ${daysSinceViewed} days`,
             href,
             type: "needs_attention"
@@ -85,7 +86,7 @@ export function useNotifications() {
         } else if (!lastViewed) {
           notifications.push({
             id: `unviewed-${app.id}`,
-            title: s.title,
+            title: displayScholarshipTitle(s.title),
             message: "You haven't opened this application yet",
             href,
             type: "needs_attention"

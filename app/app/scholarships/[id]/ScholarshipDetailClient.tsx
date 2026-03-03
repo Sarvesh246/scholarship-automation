@@ -11,7 +11,7 @@ import { TabList, Tab } from "@/components/ui/Tabs";
 import { PromptBlock } from "@/components/feature/PromptBlock";
 import { Checklist } from "@/components/feature/Checklist";
 import { ApplyToOwlModal } from "@/components/feature/ApplyToOwlModal";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { LoadingScreenBlock } from "@/components/ui/LoadingScreen";
 import { useToast } from "@/components/ui/Toast";
 import { ensureApplication, getApplication } from "@/lib/applicationStorage";
 import { getScholarship } from "@/lib/scholarshipStorage";
@@ -19,11 +19,16 @@ import { getEssays } from "@/lib/essayStorage";
 import { matchEssaysToScholarship } from "@/lib/essayMatching";
 import { getProfile } from "@/lib/profileStorage";
 import { getProfileFieldValues, checkEligibility } from "@/lib/eligibility";
+import { buildUserSignals, computeMatch } from "@/lib/matchEngine";
 import { useUser } from "@/hooks/useUser";
 import { getIdToken } from "@/hooks/useAdmin";
-import { formatCategoryDisplay, decodeHtmlEntities } from "@/lib/utils";
+import { formatScholarshipDescription } from "@/lib/formatScholarshipDescription";
+import { formatCategoryDisplay, decodeHtmlEntities, displayScholarshipTitle } from "@/lib/utils";
+import { getApplyUrl } from "@/lib/applyUrl";
+import { QualityScoreBadge } from "@/components/ui/QualityScoreBadge";
 import type { Scholarship } from "@/types";
 import type { Profile } from "@/types";
+import type { ScholarshipMatchResult } from "@/types";
 
 export default function ScholarshipDetailClient() {
   const params = useParams();
@@ -51,7 +56,7 @@ export default function ScholarshipDetailClient() {
     if (s) {
       const [existing, profileData, essaysList] = await Promise.all([
         getApplication(id),
-        s.source === "scholarship_owl" ? getProfile() : Promise.resolve(null),
+        getProfile(),
         (s.prompts ?? []).length > 0 ? getEssays() : Promise.resolve([])
       ]);
       setHasApplication(!!existing);
@@ -99,7 +104,7 @@ export default function ScholarshipDetailClient() {
       router.push(`/app/applications/${scholarship.id}`);
       showToast({
         title: "Application started",
-        message: `${scholarship.title} has been added to your pipeline.`,
+        message: `${displayScholarshipTitle(scholarship.title)} has been added to your pipeline.`,
         variant: "success"
       });
     } catch (err) {
@@ -155,22 +160,20 @@ export default function ScholarshipDetailClient() {
 
   const isOwl = scholarship?.source === "scholarship_owl";
   const isExpired = !!scholarship?.expiredAt;
+  const applyUrl = getApplyUrl(scholarship);
   const profileValues = profile
     ? getProfileFieldValues(profile, user)
     : {};
   const eligibility = scholarship ? checkEligibility(scholarship, profileValues) : null;
   const canApplyOwl = isOwl && !isExpired && (eligibility?.eligible ?? true);
 
+  const matchResult: ScholarshipMatchResult | null = scholarship && profile
+    ? computeMatch(scholarship, buildUserSignals(profile))
+    : null;
+  const hasEligibilityTags = (scholarship?.eligibilityTags ?? []).length > 0;
+
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid gap-6 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-          <Skeleton className="h-64 rounded-2xl" />
-          <Skeleton className="h-40 rounded-2xl" />
-        </div>
-      </div>
-    );
+    return <LoadingScreenBlock message="Loading scholarship…" />;
   }
 
   if (!scholarship) {
@@ -196,7 +199,7 @@ export default function ScholarshipDetailClient() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={decodeHtmlEntities(scholarship.title)}
+        title={displayScholarshipTitle(scholarship.title)}
         subtitle={decodeHtmlEntities(scholarship.sponsor)}
         primaryAction={
           <div className="flex flex-wrap items-center gap-2">
@@ -244,6 +247,9 @@ export default function ScholarshipDetailClient() {
               <span title="Screened by our quality checks">
                 <Badge variant="success">Verified</Badge>
               </span>
+            )}
+            {(scholarship.qualityScore ?? 0) > 0 && (
+              <QualityScoreBadge scholarship={scholarship} />
             )}
             {scholarship.lastVerifiedAt && (
               <span className="text-[var(--muted-2)]">
@@ -315,7 +321,7 @@ export default function ScholarshipDetailClient() {
           {tab === "overview" && (
             <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
               <div className="text-[var(--text)] whitespace-pre-line leading-relaxed">
-                {scholarship.description}
+                {formatScholarshipDescription(scholarship.description)}
               </div>
             </div>
           )}
@@ -323,15 +329,53 @@ export default function ScholarshipDetailClient() {
           {tab === "requirements" && (
             <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
               <h3 className="text-sm font-semibold font-heading">Eligibility</h3>
-              {(scholarship.eligibilityTags ?? []).length > 0 ? (
-                <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-[var(--muted)]">
-                  {(scholarship.eligibilityTags ?? []).map((tag) => (
-                    <li key={tag}>{decodeHtmlEntities(tag)}</li>
-                  ))}
-                </ul>
+              {hasEligibilityTags ? (
+                <>
+                  <p className="text-xs text-[var(--muted-2)]">Requirements for this scholarship:</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-[var(--text)] leading-relaxed">
+                    {(scholarship.eligibilityTags ?? []).map((tag) => (
+                      <li key={tag}>{decodeHtmlEntities(tag)}</li>
+                    ))}
+                  </ul>
+                  {matchResult != null && matchResult.matchScore > 0 && (
+                    <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                      <p className="text-xs font-medium text-[var(--muted)] mb-1">
+                        Your fit: {matchResult.matchScore}%
+                      </p>
+                      {matchResult.reasons.length > 0 && (
+                        <p className="text-xs text-emerald-400/90">
+                          {matchResult.reasons.join(" · ")}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : matchResult != null && matchResult.matchScore > 0 ? (
+                <>
+                  <p className="text-xs text-[var(--muted-2)]">No specific eligibility criteria listed. Based on your profile, here’s why you’re a good fit:</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold px-2.5 py-1">
+                      {matchResult.matchScore}% match
+                    </span>
+                  </div>
+                  {matchResult.reasons.length > 0 && (
+                    <ul className="mt-2 space-y-1 text-xs text-[var(--text)]">
+                      {matchResult.reasons.map((r, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-emerald-500 dark:text-emerald-400 shrink-0">✓</span>
+                          <span>{r}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {matchResult.almostEligibleReason && (
+                    <p className="mt-2 text-xs text-amber-500/90">{matchResult.almostEligibleReason}</p>
+                  )}
+                </>
               ) : (
-                <p className="mt-1 text-xs text-[var(--muted)]">
+                <p className="text-xs text-[var(--muted)]">
                   No specific eligibility requirements listed for this scholarship.
+                  {!profile && " Add your profile to see how you match."}
                 </p>
               )}
             </div>
@@ -399,6 +443,26 @@ export default function ScholarshipDetailClient() {
           )}
         </div>
 
+        <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
+          <h3 className="text-sm font-semibold font-heading">Apply</h3>
+          {applyUrl ? (
+            <a
+              href={applyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50 transition-colors w-full justify-center"
+            >
+              <span>Apply on official site</span>
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          ) : (
+            <p className="text-xs text-[var(--muted)]">
+              Application link not available for this listing. Use &quot;Report a problem&quot; below if you have the correct link.
+            </p>
+          )}
+        </div>
         <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm">
           <h3 className="text-sm font-semibold font-heading">At a glance</h3>
           <dl className="mt-2 space-y-2 text-xs text-[var(--muted)]">

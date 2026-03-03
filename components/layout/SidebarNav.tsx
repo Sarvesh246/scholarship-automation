@@ -43,7 +43,7 @@ export function SidebarNav() {
   };
 
   return (
-    <aside className="hidden h-screen w-64 shrink-0 border-r border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-4 md:flex md:flex-col">
+    <aside className="hidden h-screen w-64 shrink-0 border-r border-[var(--border)] bg-[var(--sidebar-bg)] px-4 py-4 md:flex md:flex-col">
       <div className="flex items-center gap-2 px-2 pb-6">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-linear-to-br from-amber-500 to-orange-600 shadow-md shrink-0">
           <svg className="w-[18px] h-[18px] text-[var(--on-primary)] translate-x-[1px]" viewBox="0 0 24 24" fill="currentColor">
@@ -70,16 +70,16 @@ export function SidebarNav() {
               className={cn(
                 "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[var(--muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]",
                 active &&
-                  "bg-[var(--primary-soft)] text-amber-400 hover:bg-[var(--primary-soft)] hover:text-amber-400"
+                  "bg-[var(--nav-active-bg)] text-[var(--nav-active-text)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-active-text)]"
               )}
             >
               {active && (
-                <span className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-amber-500" />
+                <span className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-[var(--nav-active-border)]" />
               )}
               {item.icon}
               <span className="flex-1">{item.label}</span>
-              {(() => { const b = getBadge(item.href); return b != null && b > 0 ? (
-                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500/20 px-1.5 text-[10px] font-semibold text-amber-400">
+              {(() => { const b = getBadge(item.href);               return b != null && b > 0 ? (
+                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--nav-active-bg)] px-1.5 text-[10px] font-semibold text-[var(--nav-active-text)]">
                   {b > 99 ? "99+" : b}
                 </span>
               ) : null; })()}
@@ -92,11 +92,11 @@ export function SidebarNav() {
             className={cn(
               "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[var(--muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]",
               pathname?.startsWith("/app/admin") &&
-                "bg-[var(--primary-soft)] text-amber-400 hover:bg-[var(--primary-soft)] hover:text-amber-400"
+                "bg-[var(--nav-active-bg)] text-[var(--nav-active-text)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-active-text)]"
             )}
           >
             {pathname?.startsWith("/app/admin") && (
-              <span className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-amber-500" />
+              <span className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-[var(--nav-active-border)]" />
             )}
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -110,7 +110,7 @@ export function SidebarNav() {
       <div className="mt-4 space-y-3 border-t border-[var(--border)] pt-4 text-xs">
         <div className="flex items-center justify-between rounded-lg bg-[var(--surface)] px-3 py-2">
           <span className="text-[var(--muted-2)]">Plan</span>
-          <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+          <span className="rounded-full bg-[var(--nav-active-bg)] border border-[var(--primary)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--nav-active-text)]">
             Free
           </span>
         </div>
@@ -120,6 +120,12 @@ export function SidebarNav() {
         >
           Upgrade (soon)
         </button>
+        <Link
+          href="/app/feedback"
+          className="block w-full rounded-lg px-3 py-1.5 text-[11px] text-[var(--muted)] hover:text-amber-400 transition-colors text-center"
+        >
+          Submit feedback
+        </Link>
         <div className="flex items-center gap-2 rounded-lg px-2 py-1.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-linear-to-br from-amber-400 to-orange-500 text-[10px] font-bold text-[var(--on-primary)] shrink-0">
             {initials}

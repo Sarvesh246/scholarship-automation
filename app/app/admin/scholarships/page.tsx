@@ -13,7 +13,7 @@ import { getScholarshipsForAdmin, invalidateScholarshipCache } from "@/lib/schol
 import { useAdmin, getIdToken } from "@/hooks/useAdmin";
 import { MAX_PRIZE_AMOUNT, titleLooksInstitutional } from "@/lib/institutionalGrantFilter";
 import type { Scholarship } from "@/types";
-import { formatCategoryDisplay, decodeHtmlEntities } from "@/lib/utils";
+import { formatCategoryDisplay, decodeHtmlEntities, displayScholarshipTitle } from "@/lib/utils";
 import type { ScholarshipCategory } from "@/types";
 
 const CATEGORIES: ScholarshipCategory[] = ["STEM", "Arts", "Community", "Leadership", "FinancialNeed"];
@@ -274,7 +274,7 @@ export default function AdminScholarshipsPage() {
             scholarships.map((s) => (
               <Card key={s.id} className="flex min-w-0 flex-wrap items-center justify-between gap-4 p-4">
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium truncate">{decodeHtmlEntities(s.title)}</p>
+                  <p className="font-medium truncate">{displayScholarshipTitle(s.title)}</p>
                   <p className="text-xs text-[var(--muted-2)]">{s.sponsor} · ${s.amount.toLocaleString()} · {s.deadline}</p>
                 </div>
                 <div className="flex gap-2 shrink-0">
@@ -397,7 +397,7 @@ export default function AdminScholarshipsPage() {
       <Modal
         open={!!deleteConfirm}
         title="Delete scholarship?"
-        description={`"${deleteConfirm ? decodeHtmlEntities(deleteConfirm.title) : ""}" will be removed. Students with an application in progress will see "Application not found."`}
+        description={`"${deleteConfirm ? displayScholarshipTitle(deleteConfirm.title) : ""}" will be removed. Students with an application in progress will see "Application not found."`}
         primaryLabel="Delete"
         onClose={() => setDeleteConfirm(null)}
         onPrimary={() => { if (deleteConfirm) void handleDelete(deleteConfirm); }}

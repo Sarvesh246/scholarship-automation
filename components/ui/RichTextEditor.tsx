@@ -6,6 +6,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import Strike from "@tiptap/extension-strike";
 import { useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { LoadingScreen } from "@/components/ui/LoadingScreen";
 
 export interface RichTextEditorProps {
   value: string;
@@ -57,6 +58,7 @@ export function RichTextEditor({
   const isInitialMount = useRef(true);
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
@@ -105,7 +107,12 @@ export function RichTextEditor({
 
   if (!editor) {
     return (
-      <div className={cn("rounded-lg border border-[var(--border)] bg-[var(--bg)] animate-pulse", className)} style={{ minHeight }} />
+      <div className={cn("space-y-1.5 text-sm", className)}>
+        {label && (
+          <label className="block text-xs font-medium text-[var(--muted)]">{label}</label>
+        )}
+        <LoadingScreen message="Preparing editor…" compact className="rounded-lg border border-[var(--border)]" style={{ minHeight }} />
+      </div>
     );
   }
 

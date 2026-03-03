@@ -77,9 +77,15 @@ export default function AdminSyncPage() {
       const data = await res.json().catch(() => ({}));
       setValidationResult(data);
       if (res.ok) {
+        const parts = [
+          `${data.totalProcessed ?? 0} processed`,
+          `${data.expiredRemoved ?? 0} expired removed`,
+          `${data.lowQualityDeleted ?? 0} low-quality deleted`,
+          `${data.hiddenCount ?? 0} hidden from main feed`,
+        ];
         showToast({
           title: "Validation complete",
-          message: `${data.totalProcessed ?? 0} processed, ${data.expiredRemoved ?? 0} expired removed.`,
+          message: parts.join(", "),
           variant: "success",
         });
       } else {
@@ -143,12 +149,19 @@ export default function AdminSyncPage() {
         </p>
       </Card>
 
-      <Card className="p-4">
+      <Card className="p-4" id="validation">
         <h3 className="font-medium text-[var(--text)]">STEP 0 — Full validation pass</h3>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          Run quality verification on all scholarships: set qualityScore, verificationStatus, domainTrustScore,
-          displayCategory, lastVerifiedAt. Removes expired. Only approved (score ≥70) show in the app.
+          Runs quality and <strong>scholarship-definition</strong> checks on every listing: quality score, verification status,
+          domain trust, display category, and <strong>funding type</strong> (scholarship vs institutional/federal). Only
+          scholarship and fellowship types show in the main app feed.
         </p>
+        <ul className="mt-2 list-inside list-disc space-y-0.5 text-sm text-[var(--muted)]">
+          <li>Removes expired and very low quality (score &lt; 50).</li>
+          <li>Applies hard exclusions: institutional keywords, award &gt; $100k, non-student applicant type, EIN/DUNS/SAM requirements.</li>
+          <li>Scholarship score (≥30): student mention, award &lt; $25k, GPA/essay boost; institution/PI/large award penalties.</li>
+          <li>Items reclassified as institutional_grant or government_program are hidden from the main feed but kept in the DB.</li>
+        </ul>
         <Button
           type="button"
           variant="secondary"
@@ -163,6 +176,11 @@ export default function AdminSyncPage() {
       {validationResult != null && (
         <Card className="p-4">
           <h3 className="mb-2 text-sm font-medium text-[var(--text)]">Validation result</h3>
+          {validationResult && typeof validationResult === "object" && "ok" in validationResult && (validationResult as { ok?: boolean }).ok && (
+            <p className="mb-2 text-xs text-[var(--muted)]">
+              Processed: {(validationResult as { totalProcessed?: number }).totalProcessed ?? 0} · Expired removed: {(validationResult as { expiredRemoved?: number }).expiredRemoved ?? 0} · Low quality deleted: {(validationResult as { lowQualityDeleted?: number }).lowQualityDeleted ?? 0} · Hidden (flagged or non–main-feed): {(validationResult as { hiddenCount?: number }).hiddenCount ?? 0}
+            </p>
+          )}
           <pre className="max-h-48 overflow-auto rounded-lg bg-[var(--bg)] p-3 text-xs text-[var(--muted)]">
             {JSON.stringify(validationResult, null, 2)}
           </pre>

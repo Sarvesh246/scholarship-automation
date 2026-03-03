@@ -82,7 +82,9 @@ export async function saveEssay(essay: {
     content: essay.content ?? ""
   };
 
-  if (!db || !uid) return record;
+  if (!db || !uid) {
+    throw new Error("Not signed in or database not ready. Please wait a moment and try again.");
+  }
   try {
     const essaysRef = doc(db, "users", uid, "essays", essayId);
     const existing = await getDoc(essaysRef);
@@ -111,10 +113,11 @@ export async function saveEssay(essay: {
         }
       }
     }
-    const { id, ...data } = record;
+    const { id: _id, ...data } = record;
     await setDoc(essaysRef, data);
-  } catch {
-    /* write failed */
+  } catch (err) {
+    if (err instanceof Error) throw err;
+    throw new Error("Failed to save essay. Check your connection and try again.");
   }
   return record;
 }

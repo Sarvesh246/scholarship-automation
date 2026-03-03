@@ -51,8 +51,21 @@ export function getAdminAuth() {
   return getAuth(getAdminApp());
 }
 
+let _firestoreSettingsApplied = false;
+
 export function getAdminFirestore() {
-  return getFirestore(getAdminApp());
+  const db = getFirestore(getAdminApp());
+  if (!_firestoreSettingsApplied) {
+    try {
+      (db as unknown as { settings: (s: { ignoreUndefinedProperties?: boolean }) => void }).settings({
+        ignoreUndefinedProperties: true,
+      });
+      _firestoreSettingsApplied = true;
+    } catch {
+      // ignore if already applied
+    }
+  }
+  return db;
 }
 
 const ADMIN_EMAILS_KEY = "ADMIN_EMAILS";

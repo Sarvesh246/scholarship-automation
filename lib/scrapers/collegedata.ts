@@ -1,14 +1,15 @@
 /**
  * Scraper for CollegeData (Peterson's) scholarship finder.
+ * Scrapes scholarship-finder with pagination; extracts deadline from card text when present.
  */
 import * as cheerio from "cheerio";
 import type { ScrapedScholarship } from "./types";
 import { parseAmountFromText } from "./parseAmount";
-import { SCRAPER_HEADERS, delay } from "./shared";
+import { SCRAPER_HEADERS, parseDeadline, delay } from "./shared";
 
 const BASE_URL = "https://www.collegedata.com";
 
-export async function scrapeCollegeData(maxPages = 3): Promise<ScrapedScholarship[]> {
+export async function scrapeCollegeData(maxPages = 10): Promise<ScrapedScholarship[]> {
   const results: ScrapedScholarship[] = [];
   const seen = new Set<string>();
 
@@ -21,6 +22,7 @@ export async function scrapeCollegeData(maxPages = 3): Promise<ScrapedScholarshi
       if (!res.ok) break;
       const html = await res.text();
       const $ = cheerio.load(html);
+      let added = 0;
 
       $('a[href*="scholarship-finder"]').each((_, el) => {
         const href = $(el).attr("href") ?? "";
@@ -33,23 +35,30 @@ export async function scrapeCollegeData(maxPages = 3): Promise<ScrapedScholarshi
         const text = block.text();
         const titleEl = block.find("h3, h4, h5, [class*='title']").first();
         const rawTitle = titleEl.text().trim();
-        if (!rawTitle || !text.includes("$")) return;
+        if (!rawTitle || (!text.includes("$") && !text.match(/\d{1,3},?\d{3}/))) return;
 
         seen.add(id);
+        added++;
+
         const amount = parseAmountFromText(text);
-        const desc = text.slice(0, 400).trim() || `${rawTitle}. Apply at ${BASE_URL}${href}`;
+        const dlMatch = text.match(/deadline[:\s]+([^\n]+?)(?:\n|$)/i) ?? text.match(/([A-Za-z]+\s+\d{1,2},?\s*\d{4})/);
+        const deadline = dlMatch ? parseDeadline(dlMatch[1].trim()) : "2026-12-31";
+
+        const fullHref = href.startsWith("http") ? href : `${BASE_URL}/${href.replace(/^\//, "")}`;
+        const desc = text.slice(0, 400).trim() || `${rawTitle}. Apply at ${fullHref}`;
 
         results.push({
           id: `collegedata-${id}`,
           title: rawTitle,
           sponsor: "CollegeData",
           amount: amount || 1000,
-          deadline: "2026-12-31",
+          deadline,
           description: desc,
         });
       });
 
       await delay(1200);
+      if (added === 0) break;
     } catch (e) {
       console.error("[scraper] collegedata page failed:", page, e);
     }

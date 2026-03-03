@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/requireAdminAuth";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
 import { enrichWithClassification } from "@/lib/classifyScholarship";
+import { formatScholarshipDescription } from "@/lib/formatScholarshipDescription";
 import { MAX_PRIZE_AMOUNT } from "@/lib/institutionalGrantFilter";
 import type { Scholarship } from "@/types";
 
@@ -48,7 +49,7 @@ export async function PATCH(
       }
     }
     if (body.deadline !== undefined) updates.deadline = String(body.deadline).trim();
-    if (body.description !== undefined) updates.description = String(body.description).trim();
+    if (body.description !== undefined) updates.description = formatScholarshipDescription(String(body.description).trim());
     if (body.estimatedTime !== undefined) updates.estimatedTime = String(body.estimatedTime).trim();
     if (Array.isArray(body.categoryTags)) updates.categoryTags = body.categoryTags.filter(Boolean);
     if (Array.isArray(body.eligibilityTags)) updates.eligibilityTags = body.eligibilityTags.filter(Boolean);

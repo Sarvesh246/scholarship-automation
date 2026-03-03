@@ -2,8 +2,9 @@ import type { Scholarship, ScholarshipCategory, SourceType } from "@/types";
 import { getAdminFirestore } from "./firebaseAdmin";
 import { isDeadlineValid } from "./scholarshipDeadline";
 import { enrichWithClassification } from "./classifyScholarship";
-import { isInstitutionalGrant, isOverMaxPrize } from "./institutionalGrantFilter";
+import { isInstitutionalGrant, isNonStudentTargetedGrant, isStudentTargetedGrant } from "./institutionalGrantFilter";
 import { runQualityVerification } from "./scholarshipQuality";
+import { formatScholarshipDescription } from "./formatScholarshipDescription";
 import { normalizeScholarship } from "./normalizeScholarship";
 import { estimateEffortTime } from "./estimateEffort";
 import {
@@ -32,6 +33,8 @@ export interface ExternalScholarshipItem {
   essay_prompts?: string[];
   docsRequired?: string[];
   docs_required?: string[];
+  /** Direct URL where the student can apply (official application page). */
+  applicationUrl?: string | null;
   /** Set by scrapers for inventory type (e.g. institutional_departmental, professional_association). */
   sourceType?: SourceType | string;
   [key: string]: unknown;
@@ -123,6 +126,20 @@ function extractEligibilityFromDescription(desc: string): string[] {
   return lines.slice(0, 10);
 }
 
+/** Extract first https? URL from text for use as application URL. */
+function extractFirstApplicationUrl(text: string): string | null {
+  if (!text || typeof text !== "string") return null;
+  const m = text.match(/https?:\/\/[^\s)\]'"]+/);
+  if (!m?.[0]) return null;
+  const url = m[0].replace(/[)\]\s'"]+$/, "").trim();
+  try {
+    new URL(url);
+    return url;
+  } catch {
+    return null;
+  }
+}
+
 function parseAmount(v: number | string | undefined): number {
   if (typeof v === "number" && Number.isFinite(v) && v >= 0) return v;
   if (typeof v === "string" && v.trim()) {
@@ -184,6 +201,11 @@ export function mapExternalToScholarship(item: ExternalScholarshipItem): Scholar
       ? (item.sourceType as SourceType)
       : undefined;
 
+  const applicationUrl =
+    typeof item.applicationUrl === "string" && item.applicationUrl.trim().startsWith("http")
+      ? item.applicationUrl.trim()
+      : extractFirstApplicationUrl(desc);
+
   return {
     id,
     title,
@@ -194,10 +216,11 @@ export function mapExternalToScholarship(item: ExternalScholarshipItem): Scholar
     eligibilityTags,
     estimatedTime,
     description: typeof item.description === "string" && item.description.trim()
-      ? item.description.trim()
+      ? formatScholarshipDescription(item.description)
       : `${title} from ${sponsor}.`,
     prompts: prompts.length > 0 ? prompts : [],
     ...(sourceType && { sourceType }),
+    ...(applicationUrl && { applicationUrl }),
   };
 }
 
@@ -232,7 +255,6 @@ export async function syncScholarshipsFromUrl(
   const toSync = items
     .filter((item) => isDeadlineValid(item.deadline))
     .map((item) => enrichWithClassification(mapExternalToScholarship(item)))
-    .filter((s) => !isOverMaxPrize(s))
     .map((s) => {
       const q = runQualityVerification(s);
       const withQuality = { ...s, ...q };
@@ -244,6 +266,10 @@ export async function syncScholarshipsFromUrl(
         domainTrustScore: q.domainTrustScore,
         displayCategory: q.displayCategory,
         lastVerifiedAt: q.lastVerifiedAt,
+        riskFlags: q.riskFlags,
+        qualityTier: q.qualityTier,
+        fundingType: q.fundingType,
+        scholarshipScore: q.scholarshipScore,
         normalized,
       };
     });
@@ -293,7 +319,12 @@ function parseGrantsGovDate(s: string | undefined): string {
 /** Map Grants.gov oppHit to ExternalScholarshipItem. Amount from fetchOpportunityDetails when available. */
 async function mapGrantsGovToExternal(
   hit: GrantsGovOppHit,
-  details?: { awardCeiling?: number; awardFloor?: number } | null
+  details?: {
+    awardCeiling?: number;
+    awardFloor?: number;
+    fundingInstrumentTypes?: string[];
+    eligibilityCategories?: string[];
+  } | null
 ): Promise<ExternalScholarshipItem> {
   const url = `https://www.grants.gov/web/grants/view-opportunity.html?oppId=${hit.id}`;
   let amount = 0;
@@ -311,7 +342,23 @@ async function mapGrantsGovToExternal(
     amount,
     deadline: parseGrantsGovDate(hit.closeDate || hit.openDate),
     description: `${hit.title || "Federal grant"} from ${hit.agencyName || "Federal"}. Apply at Grants.gov: ${url}`,
+    applicationUrl: url,
   };
+}
+
+/** Skip Grants.gov opportunity when API says Cooperative Agreement or no individual eligibility. */
+function skipGrantsGovByEligibility(details: {
+  fundingInstrumentTypes?: string[];
+  eligibilityCategories?: string[];
+} | null): boolean {
+  if (!details) return false;
+  const instruments = (details.fundingInstrumentTypes ?? []).map((s) => s.toLowerCase());
+  if (instruments.some((s) => s.includes("cooperative agreement"))) return true;
+  const elig = details.eligibilityCategories ?? [];
+  if (elig.length === 0) return false; // unknown eligibility → don't skip
+  const individualLike = /individual|unrestricted|other/i;
+  if (!elig.some((s) => individualLike.test(s))) return true; // only orgs/government
+  return false;
 }
 
 /** Sync federal grants from Grants.gov into Firestore. No API key required. */
@@ -332,13 +379,15 @@ export async function syncFromGrantsGov(maxResults = 300): Promise<{
     const hit = hits[i];
     try {
       const details = await fetchOpportunityDetails(hit.id);
+      if (skipGrantsGovByEligibility(details)) continue;
       const item = await mapGrantsGovToExternal(hit, details);
       if (!isDeadlineValid(item.deadline)) continue;
       const scholarship = enrichWithClassification(mapExternalToScholarship(item));
       scholarship.source = "grants_gov";
       scholarship.scholarshipType = "government";
       if (isInstitutionalGrant(scholarship)) continue;
-      if (isOverMaxPrize(scholarship)) continue;
+      if (isNonStudentTargetedGrant(scholarship)) continue;
+      if (!isStudentTargetedGrant(scholarship)) continue;
       const q = runQualityVerification(scholarship);
       const withQuality = {
         ...scholarship,
@@ -356,6 +405,10 @@ export async function syncFromGrantsGov(maxResults = 300): Promise<{
         domainTrustScore: q.domainTrustScore,
         displayCategory: q.displayCategory,
         lastVerifiedAt: q.lastVerifiedAt,
+        riskFlags: q.riskFlags,
+        qualityTier: q.qualityTier,
+        fundingType: q.fundingType,
+        scholarshipScore: q.scholarshipScore,
         normalized,
       };
       const ref = col.doc(toWrite.id);
@@ -509,10 +562,11 @@ function mapOwlToScholarship(
     eligibilityTags: [],
     estimatedTime,
     description: typeof att.description === "string" && att.description.trim()
-      ? att.description.trim()
+      ? formatScholarshipDescription(att.description)
       : `${title} from ScholarshipOwl.`,
     prompts,
     source: "scholarship_owl",
+    applicationUrl: `https://www.scholarshipowl.com/app/scholarship-view/${id}`,
     recurring,
     expiredAt,
     nextStart,
@@ -576,7 +630,6 @@ export async function syncFromScholarshipOwl(): Promise<{
     try {
       const scholarship = enrichWithClassification(mapOwlToScholarship(item, detail));
       scholarship.scholarshipType = scholarship.scholarshipType ?? "private";
-      if (isOverMaxPrize(scholarship)) continue;
       const q = runQualityVerification(scholarship);
       const withQuality = {
         ...scholarship,
@@ -594,6 +647,10 @@ export async function syncFromScholarshipOwl(): Promise<{
         domainTrustScore: q.domainTrustScore,
         displayCategory: q.displayCategory,
         lastVerifiedAt: q.lastVerifiedAt,
+        riskFlags: q.riskFlags,
+        qualityTier: q.qualityTier,
+        fundingType: q.fundingType,
+        scholarshipScore: q.scholarshipScore,
         normalized,
       };
       const ref = col.doc(toWrite.id);

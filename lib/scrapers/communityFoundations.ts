@@ -1,6 +1,6 @@
 /**
  * Scrape community foundation scholarship listing pages.
- * Tag: community_foundation
+ * Scrapes every URL in the list. Tag: community_foundation
  */
 import { scrapeSeedUrls, type SeedUrlConfig } from "./seedUrlScraper";
 import type { ScrapedScholarship } from "./types";
@@ -13,9 +13,8 @@ const COMMUNITY_FOUNDATION_SEED_URLS: SeedUrlConfig[] = [
   { url: "https://www.siliconvalleycf.org/scholarship-programs", sponsor: "Silicon Valley Community Foundation" },
 ];
 
-export async function scrapeCommunityFoundations(maxPages = 5): Promise<ScrapedScholarship[]> {
-  const urls = COMMUNITY_FOUNDATION_SEED_URLS.slice(0, Math.min(maxPages, COMMUNITY_FOUNDATION_SEED_URLS.length));
-  return scrapeSeedUrls(urls, {
+export async function scrapeCommunityFoundations(_maxPages = 5): Promise<ScrapedScholarship[]> {
+  return scrapeSeedUrls(COMMUNITY_FOUNDATION_SEED_URLS, {
     sourceType: "community_foundation",
     idPrefix: "commfdn",
     maxPerPage: 25,

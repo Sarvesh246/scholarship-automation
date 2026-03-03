@@ -64,6 +64,7 @@ export function TopBar({ pageTitle, onMobileMenuToggle }: TopBarProps) {
     if (pathname.startsWith("/app/deadlines")) return "Deadlines";
     if (pathname.startsWith("/app/profile")) return "Profile";
     if (pathname.startsWith("/app/settings")) return "Settings";
+    if (pathname.startsWith("/app/feedback")) return "Submit feedback";
     return "Workspace";
   })();
 

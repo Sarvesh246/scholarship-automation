@@ -5,6 +5,14 @@ export type ScholarshipCategory =
   | "Leadership"
   | "FinancialNeed";
 
+/** Classification for main feed: only "scholarship" and "fellowship" show in main UI; others are institutional/federal. */
+export type FundingType =
+  | "scholarship"
+  | "fellowship"
+  | "research_grant"
+  | "institutional_grant"
+  | "government_program";
+
 /** Inventory/source type for filtering and display (beyond aggregators). */
 export type SourceType =
   | "aggregator"
@@ -30,6 +38,9 @@ export type ApplicationStatus =
   | "reviewing"
   | "submitted";
 
+/** Outcome after submission for pipeline display. */
+export type ApplicationOutcome = "awaiting" | "won" | "rejected" | null;
+
 export interface Scholarship {
   id: string;
   title: string;
@@ -51,6 +62,8 @@ export interface Scholarship {
   status?: "draft" | "published";
   /** Government vs private/institutional. Set on sync. */
   scholarshipType?: "government" | "private";
+  /** Funding classification: only scholarship/fellowship show in main feed. Set during quality/sync. */
+  fundingType?: FundingType;
   /** True if non-citizens (international, DACA, undocumented) may qualify. Set on sync. */
   nonCitizenEligible?: boolean;
   /** Curated category for display: merit, need-based, essay, sweepstakes, corporate, academic, local. */
@@ -63,6 +76,14 @@ export interface Scholarship {
   domainTrustScore?: number;
   /** Last time quality/verification was run (ISO string or Firestore timestamp). */
   lastVerifiedAt?: string | { _seconds: number } | null;
+  /** Last time this listing was checked/refreshed (for staleness). */
+  lastCheckedAt?: string | null;
+  /** Last time content was meaningfully updated. */
+  lastUpdatedAt?: string | null;
+  /** Risk flags from legitimacy heuristics: e.g. "missing_deadline", "unknown_sponsor", "external_redirect", "potential_risk". */
+  riskFlags?: string[];
+  /** Quality tier for display: high (70+), medium (50-69), low (<50). Set during verification. */
+  qualityTier?: "high" | "medium" | "low";
   /** Optional application or org URL for verification. */
   applicationUrl?: string | null;
   /** Optional contact email (not generic spam domain). */
@@ -121,6 +142,8 @@ export interface NormalizedScholarship {
   source: string;
   /** Same as Scholarship.sourceType for filtering. */
   sourceType?: SourceType;
+  /** Funding classification; only scholarship/fellowship appear in main feed. */
+  fundingType?: FundingType;
   matchable: boolean;
 }
 
@@ -136,6 +159,8 @@ export interface Application {
     prompt: string;
     response: string;
   }[];
+  /** Outcome after submission: awaiting decision, won, or rejected. */
+  outcome?: ApplicationOutcome;
   /** When applied via ScholarshipOwl: status returned from their API. */
   owlStatus?: "received" | "review" | "accepted" | "rejected";
   /** Last time the user opened this application. Used for "not viewed in a while" notifications. */

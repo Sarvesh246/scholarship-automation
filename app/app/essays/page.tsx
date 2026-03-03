@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { EssayCard } from "@/components/feature/EssayCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { LoadingScreenBlock } from "@/components/ui/LoadingScreen";
 import { getEssays } from "@/lib/essayStorage";
 import { htmlToMarkdown, htmlToPlainText } from "@/lib/richText";
 import type { Essay } from "@/types";
@@ -117,16 +117,7 @@ export default function EssaysPage() {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-32" />
-        <div className="grid gap-3 md:grid-cols-2">
-          {[1, 2].map((i) => (
-            <Skeleton key={i} className="h-28 rounded-2xl" />
-          ))}
-        </div>
-      </div>
-    );
+    return <LoadingScreenBlock message="Loading essays…" />;
   }
 
   return (

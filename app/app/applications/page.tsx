@@ -10,11 +10,11 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Tabs } from "@/components/ui/Tabs";
 import { PipelineBoard } from "@/components/feature/PipelineBoard";
 import { Modal } from "@/components/ui/Modal";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { LoadingScreenBlock } from "@/components/ui/LoadingScreen";
 import { useToast } from "@/components/ui/Toast";
 import { getApplications, deleteApplication } from "@/lib/applicationStorage";
-import { getScholarships } from "@/lib/scholarshipStorage";
-import { decodeHtmlEntities } from "@/lib/utils";
+import { getScholarships, getScholarship } from "@/lib/scholarshipStorage";
+import { decodeHtmlEntities, displayScholarshipTitle } from "@/lib/utils";
 import type { Application, Scholarship } from "@/types";
 
 export default function ApplicationsPage() {
@@ -50,6 +50,22 @@ export default function ApplicationsPage() {
     loadData();
   }, [loadData]);
 
+  // Load scholarship details for any application whose scholarship isn't in the first-page cache
+  useEffect(() => {
+    if (applications.length === 0) return;
+    const ids = new Set(applications.map((a) => a.scholarshipId));
+    const missingIds = [...ids].filter((id) => !scholarships.some((s) => s.id === id));
+    if (missingIds.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const fetched = await Promise.all(missingIds.map((id) => getScholarship(id)));
+      if (cancelled) return;
+      const added = fetched.filter((s): s is Scholarship => s != null);
+      if (added.length > 0) setScholarships((prev) => [...prev, ...added]);
+    })();
+    return () => { cancelled = true; };
+  }, [applications, scholarships]);
+
   useEffect(() => {
     const onFocus = () => { loadData(); };
     window.addEventListener("focus", onFocus);
@@ -60,9 +76,10 @@ export default function ApplicationsPage() {
     () =>
       applications.map((app) => {
         const scholarship = scholarships.find((s) => s.id === app.scholarshipId);
+        const rawTitle = displayScholarshipTitle(scholarship?.title ?? "");
         return {
           id: app.id,
-          title: scholarship?.title ?? "Application",
+          title: rawTitle.trim() || "Application",
           amount: scholarship?.amount,
           deadline: scholarship?.deadline,
           status: app.status,
@@ -75,12 +92,7 @@ export default function ApplicationsPage() {
   );
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-48 rounded-2xl" />
-      </div>
-    );
+    return <LoadingScreenBlock message="Loading applications…" />;
   }
 
   return (
@@ -154,7 +166,7 @@ export default function ApplicationsPage() {
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-medium">
-                    {scholarship ? decodeHtmlEntities(scholarship.title) : "Application"}
+                    {scholarship ? displayScholarshipTitle(scholarship.title) : "Application"}
                   </p>
                   <p className="text-[10px] text-[var(--muted-2)]">
                     {scholarship ? decodeHtmlEntities(scholarship.sponsor) : ""}

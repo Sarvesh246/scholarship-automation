@@ -1,7 +1,8 @@
 import { memo } from "react";
 import Link from "next/link";
 import { ApplicationStatus } from "@/types";
-import { cn, decodeHtmlEntities } from "@/lib/utils";
+import type { ApplicationOutcome } from "@/types";
+import { cn, decodeHtmlEntities, displayScholarshipTitle } from "@/lib/utils";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Badge } from "@/components/ui/Badge";
 
@@ -15,6 +16,8 @@ export interface PipelineCardData {
   nextTask: string;
   /** When applied via ScholarshipOwl: received | review | accepted | rejected */
   owlStatus?: "received" | "review" | "accepted" | "rejected";
+  /** After submission: awaiting decision, won, or rejected. */
+  outcome?: ApplicationOutcome;
 }
 
 function formatAmount(amount?: number) {
@@ -49,7 +52,7 @@ const ApplicationCard = memo(function ApplicationCard({
   const content = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-semibold leading-snug min-w-0 flex-1">{decodeHtmlEntities(card.title)}</p>
+        <p className="text-sm font-semibold leading-snug min-w-0 flex-1">{displayScholarshipTitle(card.title) || "Application"}</p>
         {onDelete && (
           <button
             type="button"
@@ -79,16 +82,32 @@ const ApplicationCard = memo(function ApplicationCard({
           {OWL_STATUS_LABEL[card.owlStatus] ?? card.owlStatus}
         </Badge>
       )}
-      <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-[var(--muted-2)]">
-        {card.amount && (
-          <span className="text-amber-400 font-medium">{formatAmount(card.amount)}</span>
-        )}
-        {card.amount && card.deadline && <span>·</span>}
-        {card.deadline && <span>Due {formatDeadline(card.deadline)}</span>}
-      </div>
-      <div className="mt-1">
+      {card.status === "submitted" && card.outcome && !card.owlStatus && (
+        <Badge
+          variant={
+            card.outcome === "won"
+              ? "success"
+              : card.outcome === "rejected"
+                ? "danger"
+                : "info"
+          }
+          className="mt-1"
+        >
+          {card.outcome === "awaiting" ? "Awaiting" : card.outcome === "won" ? "Won" : "Rejected"}
+        </Badge>
+      )}
+      {(card.amount ?? card.deadline) && (
+        <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-[var(--muted-2)]">
+          {card.amount && (
+            <span className="text-amber-400 font-medium">{formatAmount(card.amount)}</span>
+          )}
+          {card.amount && card.deadline && <span>·</span>}
+          {card.deadline && <span>Due {formatDeadline(card.deadline)}</span>}
+        </div>
+      )}
+      <div className="mt-2 pt-2 border-t border-[var(--border)]">
         <ProgressBar value={card.progress} />
-        <p className="mt-1 text-[10px] font-semibold text-[var(--text)]">
+        <p className="mt-1.5 text-[11px] font-medium text-[var(--muted)]">
           Next step: {card.nextTask.replace(/^Review requirements and prompts$/i, "Review requirements").replace(/^Next:?\s*/i, "")}
         </p>
       </div>

@@ -11,13 +11,13 @@ export interface ScholarshipsPageResponse {
   nextCursor: string | null;
 }
 
-/** Fetch one page of scholarships (max 20). */
+/** Fetch one page of scholarships (max 100). */
 export async function fetchScholarshipsPage(params: {
   limit?: number;
   cursor?: string | null;
   q?: string;
 }): Promise<ScholarshipsPageResponse> {
-  const limit = Math.min(20, Math.max(1, params.limit ?? 20));
+  const limit = Math.min(100, Math.max(1, params.limit ?? 100));
   const search = new URLSearchParams();
   search.set("limit", String(limit));
   if (params.cursor) search.set("cursor", params.cursor);
@@ -29,7 +29,7 @@ export async function fetchScholarshipsPage(params: {
 }
 
 /** Fetch first page only (for dashboard, deadlines, etc.). */
-export async function fetchScholarshipsFirstPage(limit = 20): Promise<Scholarship[]> {
+export async function fetchScholarshipsFirstPage(limit = 100): Promise<Scholarship[]> {
   const { items } = await fetchScholarshipsPage({ limit });
   return items;
 }

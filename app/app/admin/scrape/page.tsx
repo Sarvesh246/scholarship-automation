@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -9,14 +10,40 @@ import { useAdmin, getIdToken } from "@/hooks/useAdmin";
 import { SCRAPERS, type ScraperId } from "@/lib/scrapers";
 
 const SCRAPER_IDS = Object.keys(SCRAPERS) as ScraperId[];
+const STORAGE_KEY = "adminScrapeJobId";
 
 export default function AdminScrapePage() {
+  const searchParams = useSearchParams();
+  const jobIdFromUrl = searchParams.get("job");
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { showToast } = useToast();
   const [scraping, setScraping] = useState(false);
   const [cleaningExpired, setCleaningExpired] = useState(false);
   const [lastCleanupDone, setLastCleanupDone] = useState<number | null>(null);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [jobStatus, setJobStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!jobIdFromUrl || !isAdmin) return;
+    let cancelled = false;
+    getIdToken()
+      .then((token) => {
+        if (!token) return null;
+        return fetch(`/api/admin/scrape/status?jobId=${encodeURIComponent(jobIdFromUrl)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      })
+      .then((res) => (res?.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        setJobStatus(data.status);
+        if (data.status === "completed" || data.status === "failed") {
+          setResult(data.result ?? { error: (data.result as { error?: string })?.error ?? "Unknown" });
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [jobIdFromUrl, isAdmin]);
 
   const runAllSources = async () => {
     const token = await getIdToken();
@@ -27,35 +54,52 @@ export default function AdminScrapePage() {
     setScraping(true);
     setResult(null);
     try {
-      const [syncRes, scrapeRes] = await Promise.all([
-        fetch("/api/admin/sync", { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/admin/scrape", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ maxPages: 5 }),
-        }),
-      ]);
+      const syncRes = await fetch("/api/admin/sync", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
       const syncData = await syncRes.json().catch(() => ({}));
-      const scrapeData = await scrapeRes.json().catch(() => ({}));
-      setResult({ sync: syncData, scrape: scrapeData });
-      const parts: string[] = [];
-      if (syncData.owl?.created != null || syncData.owl?.updated != null) {
-        parts.push(`Owl: ${syncData.owl.created ?? 0} created, ${syncData.owl.updated ?? 0} updated`);
-      }
-      if (syncData.grantsGov?.created != null || syncData.grantsGov?.updated != null) {
-        parts.push(`Grants.gov: ${syncData.grantsGov.created ?? 0} created, ${syncData.grantsGov.updated ?? 0} updated`);
-      }
-      for (const [id, r] of Object.entries(scrapeData.results ?? {})) {
-        const rr = r as { created?: number; updated?: number };
-        if ((rr.created ?? 0) + (rr.updated ?? 0) > 0) {
-          parts.push(`${SCRAPERS[id as ScraperId]?.name ?? id}: ${rr.created ?? 0} created, ${rr.updated ?? 0} updated`);
-        }
-      }
-      showToast({
-        title: "All sources updated",
-        message: parts.length ? parts.join(". ") : "Check result below.",
-        variant: "success",
+
+      const scrapeRes = await fetch("/api/admin/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ maxPages: 5, background: true }),
       });
+      const scrapeData = await scrapeRes.json().catch(() => ({}));
+
+      setResult({ sync: syncData, scrape: scrapeData });
+
+      if (scrapeRes.status === 202 && scrapeData.jobId) {
+        if (typeof sessionStorage !== "undefined") sessionStorage.setItem(STORAGE_KEY, scrapeData.jobId);
+        const syncParts: string[] = [];
+        if (syncData.owl?.created != null || syncData.owl?.updated != null) {
+          syncParts.push(`Owl: ${syncData.owl.created ?? 0} created, ${syncData.owl.updated ?? 0} updated`);
+        }
+        if (syncData.grantsGov?.created != null || syncData.grantsGov?.updated != null) {
+          syncParts.push(`Grants.gov: ${syncData.grantsGov.created ?? 0} created, ${syncData.grantsGov.updated ?? 0} updated`);
+        }
+        showToast({
+          title: "Sync done. Scrape running in background",
+          message: syncParts.length ? syncParts.join(". ") + " Scrape will notify you when done." : "Scrape running in background. You can leave this page.",
+          variant: "success",
+        });
+      } else {
+        const parts: string[] = [];
+        if (syncData.owl?.created != null || syncData.owl?.updated != null) {
+          parts.push(`Owl: ${syncData.owl.created ?? 0} created, ${syncData.owl.updated ?? 0} updated`);
+        }
+        if (syncData.grantsGov?.created != null || syncData.grantsGov?.updated != null) {
+          parts.push(`Grants.gov: ${syncData.grantsGov.created ?? 0} created, ${syncData.grantsGov.updated ?? 0} updated`);
+        }
+        for (const [id, r] of Object.entries(scrapeData.results ?? {})) {
+          const rr = r as { created?: number; updated?: number };
+          if ((rr.created ?? 0) + (rr.updated ?? 0) > 0) {
+            parts.push(`${SCRAPERS[id as ScraperId]?.name ?? id}: ${rr.created ?? 0} created, ${rr.updated ?? 0} updated`);
+          }
+        }
+        showToast({
+          title: "All sources updated",
+          message: parts.length ? parts.join(". ") : "Check result below.",
+          variant: "success",
+        });
+      }
     } catch (e) {
       showToast({
         title: "Update failed",
@@ -113,6 +157,7 @@ export default function AdminScrapePage() {
     }
     setScraping(true);
     setResult(null);
+    setJobStatus(null);
     try {
       const res = await fetch("/api/admin/scrape", {
         method: "POST",
@@ -123,9 +168,22 @@ export default function AdminScrapePage() {
         body: JSON.stringify({
           scrapers: scrapers ?? SCRAPER_IDS,
           maxPages: 5,
+          background: true,
         }),
       });
       const data = await res.json().catch(() => ({}));
+
+      if (res.status === 202 && data.jobId) {
+        if (typeof sessionStorage !== "undefined") sessionStorage.setItem(STORAGE_KEY, data.jobId);
+        showToast({
+          title: "Scrape running in background",
+          message: "You can leave this page. We'll notify you when it's done.",
+          variant: "success",
+        });
+        setScraping(false);
+        return;
+      }
+
       setResult(data);
       if (res.ok) {
         const parts: string[] = [];
@@ -252,9 +310,22 @@ export default function AdminScrapePage() {
         ))}
       </div>
 
+      {jobIdFromUrl && (jobStatus === "pending" || jobStatus === "running") && (
+        <Card className="p-4">
+          <p className="text-sm text-[var(--muted)]">
+            Scrape in progress. You&apos;ll get a notification when it&apos;s done, or refresh this page to see the audit.
+          </p>
+        </Card>
+      )}
+
       {result != null && (
         <Card className="p-4">
-          <h3 className="mb-2 text-sm font-medium text-[var(--text)]">Last result</h3>
+          <h3 className="mb-2 text-sm font-medium text-[var(--text)]">
+            {jobIdFromUrl ? "Scrape audit" : "Last result"}
+            {jobStatus && (
+              <span className="ml-2 text-xs font-normal text-[var(--muted)]">({jobStatus})</span>
+            )}
+          </h3>
           <pre className="max-h-64 overflow-auto rounded-lg bg-[var(--bg)] p-3 text-xs text-[var(--muted)]">
             {JSON.stringify(result, null, 2)}
           </pre>

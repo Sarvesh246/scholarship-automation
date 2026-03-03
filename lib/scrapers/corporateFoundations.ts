@@ -1,6 +1,6 @@
 /**
  * Scrape corporate foundation / CSR scholarship pages.
- * Tag: corporate_foundation
+ * Scrapes every URL in the list. Tag: corporate_foundation
  */
 import { scrapeSeedUrls, type SeedUrlConfig } from "./seedUrlScraper";
 import type { ScrapedScholarship } from "./types";
@@ -13,9 +13,8 @@ const CORPORATE_FOUNDATION_SEED_URLS: SeedUrlConfig[] = [
   { url: "https://www.bankofamerica.com/community/financial-education/scholarships.go", sponsor: "Bank of America" },
 ];
 
-export async function scrapeCorporateFoundations(maxPages = 5): Promise<ScrapedScholarship[]> {
-  const urls = CORPORATE_FOUNDATION_SEED_URLS.slice(0, Math.min(maxPages, CORPORATE_FOUNDATION_SEED_URLS.length));
-  return scrapeSeedUrls(urls, {
+export async function scrapeCorporateFoundations(_maxPages = 5): Promise<ScrapedScholarship[]> {
+  return scrapeSeedUrls(CORPORATE_FOUNDATION_SEED_URLS, {
     sourceType: "corporate_foundation",
     idPrefix: "corpfdn",
     maxPerPage: 20,

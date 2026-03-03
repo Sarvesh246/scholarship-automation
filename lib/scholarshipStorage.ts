@@ -2,9 +2,17 @@ import type { Scholarship } from "@/types";
 import { db } from "./firebase";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { fetchScholarshipsFirstPage, fetchScholarshipById } from "./scholarshipApi";
-import { isInstitutionalGrant, isOverMaxPrize } from "./institutionalGrantFilter";
+import { isInstitutionalGrant, isNonStudentTargetedGrant, isStudentTargetedGrant } from "./institutionalGrantFilter";
 import { MIN_SCORE_APPROVED } from "./scholarshipQuality";
 import { logFirestoreRead } from "./firestoreReadLog";
+
+/** Funding types that belong in the main scholarship feed. */
+const MAIN_FEED_FUNDING_TYPES = new Set<string>(["scholarship", "fellowship"]);
+function showInMainFeed(s: Scholarship): boolean {
+  const ft = s.fundingType;
+  if (!ft) return true; // legacy
+  return MAIN_FEED_FUNDING_TYPES.has(ft);
+}
 
 /** Client-side cache for first page (avoids duplicate fetches in same session). */
 let firstPageCache: Scholarship[] | null = null;
@@ -29,18 +37,20 @@ function passesQualityGate(s: Scholarship): boolean {
 }
 
 /**
- * Get first page of scholarships (max 20). Uses gateway API + server cache.
+ * Get first page of scholarships (max 100). Uses gateway API + server cache.
  * No direct Firestore reads from client.
+ * Fetches 100 so dashboard "Curated for you" matches Greenlight count on scholarships page.
  */
 export async function getScholarships(includeDrafts = false): Promise<Scholarship[]> {
   if (typeof window === "undefined") return [];
   if (firstPageCache && !includeDrafts) return firstPageCache;
   try {
-    const items = await fetchScholarshipsFirstPage(20);
+    const items = await fetchScholarshipsFirstPage(100);
     const filtered = includeDrafts
       ? items
       : items.filter((s) => {
           if (s.status === "draft") return false;
+          if (!showInMainFeed(s)) return false;
           return passesQualityGate(s);
         });
     if (!includeDrafts) firstPageCache = filtered;
@@ -76,7 +86,8 @@ export async function getScholarship(id: string): Promise<Scholarship | null> {
   try {
     const s = await fetchScholarshipById(id);
     if (!s) return null;
-    if (isJunkScholarship(s) || isInstitutionalGrant(s) || isOverMaxPrize(s)) return null;
+    if (isJunkScholarship(s) || isInstitutionalGrant(s) || isNonStudentTargetedGrant(s) || !isStudentTargetedGrant(s)) return null;
+    if (!showInMainFeed(s)) return null;
     if (!passesQualityGate(s)) return null;
     return s;
   } catch {

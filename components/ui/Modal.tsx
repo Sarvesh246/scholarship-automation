@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "./Button";
 
 interface ModalProps {
@@ -24,7 +25,7 @@ export function Modal({
   title,
   description,
   primaryLabel = "Confirm",
-  secondaryLabel = "Cancel",
+  secondaryLabel,
   onClose,
   onPrimary,
   onSecondary,
@@ -49,9 +50,9 @@ export function Modal({
     if (closeOnPrimaryClick) onClose();
   };
 
-  return (
+  const modalContent = (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] px-4 py-6"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--overlay)] px-4 py-6"
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -61,30 +62,35 @@ export function Modal({
         aria-hidden="true"
         onClick={onClose}
       />
-      <div className="relative flex max-h-[90vh] w-full max-w-md flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-lg">
-        <div className="shrink-0 px-6 pt-6">
-          <h2 className="text-sm font-semibold font-heading">{title}</h2>
+      <div
+        className="relative z-10 flex max-h-[90vh] w-full max-w-md flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="shrink-0 px-6 pt-6 pb-0">
+          <h2 className="text-base font-semibold font-heading">{title}</h2>
           {description && (
-            <p className="mt-1 text-xs text-[var(--muted)]">{description}</p>
+            <p className="mt-1.5 text-xs text-[var(--muted)]">{description}</p>
           )}
         </div>
         {children && (
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-4 text-sm">
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-1 text-sm">
             {children}
           </div>
         )}
-        <div className="shrink-0 flex justify-end gap-3 border-t border-[var(--border)] px-6 py-4">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              onSecondary?.();
-              onClose();
-            }}
-          >
-            {secondaryLabel}
-          </Button>
+        <div className={`shrink-0 flex border-t border-[var(--border)] px-6 py-4 ${secondaryLabel != null && secondaryLabel !== "" ? "justify-end gap-3" : "justify-end"}`}>
+          {secondaryLabel != null && secondaryLabel !== "" ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                onSecondary?.();
+                onClose();
+              }}
+            >
+              {secondaryLabel}
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="sm"
@@ -100,4 +106,9 @@ export function Modal({
       </div>
     </div>
   );
+
+  if (typeof document !== "undefined" && document.body) {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 }

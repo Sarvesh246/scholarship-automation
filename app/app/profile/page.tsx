@@ -6,13 +6,17 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { StateSelect } from "@/components/ui/StateSelect";
+import { CountrySelect } from "@/components/ui/CountrySelect";
+import { MajorPillInput } from "@/components/ui/MajorPillInput";
+import { LoadingScreenBlock } from "@/components/ui/LoadingScreen";
 import { useToast } from "@/components/ui/Toast";
 import { getProfile, saveProfile } from "@/lib/profileStorage";
 import { updateUserDisplayName } from "@/lib/auth";
 import { useUser } from "@/hooks/useUser";
 import { invalidateMatchCache } from "@/lib/matchEngine";
 import { getProfileCompletion, getMissingItemsForMatchUnlock } from "@/lib/profileCompletion";
+import { expandMajor } from "@/lib/majorAbbreviations";
 import type { Profile } from "@/types";
 
 export default function ProfilePage() {
@@ -62,7 +66,14 @@ export default function ProfilePage() {
       setSchoolName(p.schoolName ?? p.demographics?.school ?? "");
       setGpaScale(p.academics?.gpaScale === "5.0" ? "5.0" : p.academics?.gpaScale === "custom" ? "custom" : "4.0");
       setGpaScaleCustom(p.academics?.gpaScaleCustom != null ? String(p.academics.gpaScaleCustom) : "");
-      setIntendedMajors(Array.isArray(p.intendedMajors) ? p.intendedMajors : []);
+      setIntendedMajors(
+        Array.isArray(p.intendedMajors) && p.intendedMajors.length > 0
+          ? p.intendedMajors
+          : (p.majorsFreeText ?? "")
+              .split(/[,;]/)
+              .map((s) => expandMajor(s.trim()))
+              .filter(Boolean)
+      );
       setMajorsFreeText(p.majorsFreeText ?? "");
       setTimeBudgetPreference(p.timeBudgetPreference ?? "medium");
       setEssayPreference(p.essayPreference ?? true);
@@ -91,7 +102,7 @@ export default function ProfilePage() {
     educationLevel: "high_school",
     schoolName: schoolName.trim() || undefined,
     intendedMajors: intendedMajors.length ? intendedMajors : undefined,
-    majorsFreeText: majorsFreeText.trim() || undefined,
+    majorsFreeText: intendedMajors.length ? undefined : majorsFreeText.trim() || undefined,
     timeBudgetPreference,
     essayPreference,
     needBasedInterest,
@@ -154,17 +165,7 @@ export default function ProfilePage() {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-32" />
-        <Skeleton className="h-16 rounded-2xl" />
-        <div className="grid gap-4 md:grid-cols-2">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-48 rounded-2xl" />
-          ))}
-        </div>
-      </div>
-    );
+    return <LoadingScreenBlock message="Loading profile…" />;
   }
 
   return (
@@ -181,13 +182,30 @@ export default function ProfilePage() {
 
       <Card className="space-y-3 p-4">
         <div className="flex items-center justify-between text-xs">
-          <p className="font-medium text-[var(--muted)]">Profile completion</p>
-          <p className="text-amber-400">{completion}%</p>
+          <p className="font-medium text-[var(--muted)]">Profile strength</p>
+          <p className="text-amber-400 font-semibold">{completion}%</p>
         </div>
         <ProgressBar value={completion} />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+          <span className={academics.gpa?.trim() ? "text-emerald-500 dark:text-emerald-400" : "text-amber-500"}>
+            {academics.gpa?.trim() ? "✓" : "⚠"} GPA
+          </span>
+          <span className={academics.major?.trim() || intendedMajors.length > 0 || majorsFreeText.trim() ? "text-emerald-500 dark:text-emerald-400" : "text-amber-500"}>
+            {academics.major?.trim() || intendedMajors.length > 0 || majorsFreeText.trim() ? "✓" : "⚠"} Major
+          </span>
+          <span className={location.state?.trim() || location.country?.trim() ? "text-emerald-500 dark:text-emerald-400" : "text-amber-500"}>
+            {location.state?.trim() || location.country?.trim() ? "✓" : "⚠"} State / location
+          </span>
+          <span className={activities.length > 0 ? "text-emerald-500 dark:text-emerald-400" : "text-amber-500"}>
+            {activities.length > 0 ? "✓" : "⚠"} Activities
+          </span>
+          <span className={awards.length > 0 ? "text-emerald-500 dark:text-emerald-400" : "text-amber-500"}>
+            {awards.length > 0 ? "✓" : "⚠"} Awards
+          </span>
+        </div>
         {missingCount > 0 ? (
           <p className="text-[11px] text-[var(--muted-2)]">
-            Completing your profile increases match accuracy. Add {missingCount} more: {suggestions.join(", ")}
+            Add {suggestions.join(", ").toLowerCase()} to unlock more matches.
           </p>
         ) : (
           <p className="text-[11px] text-emerald-400/90">Profile complete — you get the best match accuracy.</p>
@@ -287,25 +305,32 @@ export default function ProfilePage() {
 
         <Card className="space-y-3 p-4">
           <h3 className="text-sm font-semibold font-heading">Location</h3>
-          <p className="text-[11px] text-[var(--muted-2)]">Used to filter scholarships by state.</p>
-          <Input
-            label="Country"
-            placeholder="e.g. USA"
-            value={location.country}
-            onChange={(e) => setLocation((prev) => ({ ...prev, country: e.target.value }))}
-          />
-          <Input
+          <p className="text-[11px] text-[var(--muted-2)]">Used to personalize your Greenlight experience. Your curated list updates when you save.</p>
+          <form autoComplete="off" className="space-y-3">
+            <CountrySelect
+              label="Country"
+              value={location.country}
+              onChange={(code) => setLocation((prev) => ({ ...prev, country: code }))}
+              placeholder="Type or choose country"
+            />
+            <StateSelect
             label="State"
-            placeholder="e.g. CA"
             value={location.state}
-            onChange={(e) => setLocation((prev) => ({ ...prev, state: e.target.value }))}
+            onChange={(code) => setLocation((prev) => ({ ...prev, state: code }))}
+            placeholder="Type or choose state"
           />
           <Input
             label="City (optional)"
+            name="profile-city"
+            autoComplete="nope"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             placeholder="e.g. San Francisco"
             value={location.city}
             onChange={(e) => setLocation((prev) => ({ ...prev, city: e.target.value }))}
           />
+          </form>
           <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
             Save location
           </Button>
@@ -321,31 +346,51 @@ export default function ProfilePage() {
                   key={t}
                   type="button"
                   onClick={() => setTimeBudgetPreference(t)}
-                  className={`rounded-lg px-3 py-1.5 text-sm ${timeBudgetPreference === t ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "border border-[var(--border)] text-[var(--muted)]"}`}
+                  className={`rounded-lg px-3 py-1.5 text-sm ${timeBudgetPreference === t ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "border border-[var(--border)] text-[var(--muted)] hover:border-amber-500/30 hover:text-[var(--text)]"}`}
                 >
                   {t === "low" ? "Low" : t === "medium" ? "Medium" : "High"}
                 </button>
               ))}
             </div>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer text-sm">
-            <input
-              type="checkbox"
-              checked={essayPreference}
-              onChange={(e) => setEssayPreference(e.target.checked)}
-              className="rounded border-[var(--border)] text-amber-500"
-            />
-            Okay with essays
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer text-sm">
-            <input
-              type="checkbox"
-              checked={needBasedInterest}
-              onChange={(e) => setNeedBasedInterest(e.target.checked)}
-              className="rounded border-[var(--border)] text-amber-500"
-            />
-            Interested in need-based scholarships
-          </label>
+          <div>
+            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Okay with essays</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setEssayPreference(true)}
+                className={`rounded-lg px-3 py-1.5 text-sm ${essayPreference ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "border border-[var(--border)] text-[var(--muted)] hover:border-amber-500/30 hover:text-[var(--text)]"}`}
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                onClick={() => setEssayPreference(false)}
+                className={`rounded-lg px-3 py-1.5 text-sm ${!essayPreference ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "border border-[var(--border)] text-[var(--muted)] hover:border-amber-500/30 hover:text-[var(--text)]"}`}
+              >
+                No
+              </button>
+            </div>
+          </div>
+          <div>
+            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Interested in need-based scholarships</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setNeedBasedInterest(true)}
+                className={`rounded-lg px-3 py-1.5 text-sm ${needBasedInterest ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "border border-[var(--border)] text-[var(--muted)] hover:border-amber-500/30 hover:text-[var(--text)]"}`}
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                onClick={() => setNeedBasedInterest(false)}
+                className={`rounded-lg px-3 py-1.5 text-sm ${!needBasedInterest ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "border border-[var(--border)] text-[var(--muted)] hover:border-amber-500/30 hover:text-[var(--text)]"}`}
+              >
+                No
+              </button>
+            </div>
+          </div>
           <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
             Save preferences
           </Button>
@@ -353,12 +398,11 @@ export default function ProfilePage() {
 
         <Card className="space-y-3 p-4">
           <h3 className="text-sm font-semibold font-heading">Intended major(s)</h3>
-          <p className="text-[11px] text-[var(--muted-2)]">Refines Greenlight matches.</p>
-          <Input
-            label="Free text (e.g. CS, Biology)"
-            placeholder="Comma-separated"
-            value={majorsFreeText}
-            onChange={(e) => setMajorsFreeText(e.target.value)}
+          <p className="text-[11px] text-[var(--muted-2)]">Refines your Greenlight curation. Type CS, Bio, etc. — space, comma, or enter to add a pill. We expand abbreviations automatically.</p>
+          <MajorPillInput
+            value={intendedMajors}
+            onChange={setIntendedMajors}
+            placeholder="e.g. CS, Biology — space, comma, or enter to add"
           />
           <Button type="button" size="sm" onClick={handleSaveAll} disabled={saving}>
             Save majors

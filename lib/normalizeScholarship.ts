@@ -2,7 +2,8 @@
  * Build normalized scholarship object for reliable matching.
  * Every scholarship gets normalized fields + matchable flag.
  */
-import type { Scholarship, NormalizedScholarship, SourceType } from "@/types";
+import type { Scholarship, NormalizedScholarship, SourceType, FundingType } from "@/types";
+import { displayScholarshipTitle } from "@/lib/utils";
 
 const REQUIREMENT_KEYWORDS = ["essay", "transcript", "recommendation", "letter of recommendation", "portfolio", "interview", "resume", "cv"];
 
@@ -125,7 +126,7 @@ export function normalizeScholarship(s: Scholarship): NormalizedScholarship {
     s.verificationStatus === "needs_review" ? "needs_review" : "rejected";
 
   return {
-    title: (s.title ?? "").trim(),
+    title: displayScholarshipTitle(s.title) || (s.title ?? "").trim(),
     orgName: (s.sponsor ?? "").trim(),
     orgWebsite: s.applicationUrl ?? null,
     applyUrl: s.applicationUrl ?? null,
@@ -146,7 +147,8 @@ export function normalizeScholarship(s: Scholarship): NormalizedScholarship {
     qualityScore: s.qualityScore ?? 0,
     lastVerifiedAt: s.lastVerifiedAt ? (typeof s.lastVerifiedAt === "string" ? s.lastVerifiedAt : null) : null,
     source: s.source ?? "manual",
-    sourceType: s.sourceType,
+    ...(s.sourceType != null && { sourceType: s.sourceType }),
+    ...(s.fundingType != null && { fundingType: s.fundingType as FundingType }),
     matchable: hasStructuredEligibility && (s.verificationStatus === "approved" || (s.qualityScore ?? 0) >= 70),
   };
 }

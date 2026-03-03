@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DeadlineList } from "@/components/feature/DeadlineList";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { LoadingScreenBlock } from "@/components/ui/LoadingScreen";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { getApplications, ensureApplication } from "@/lib/applicationStorage";
@@ -14,7 +14,7 @@ import { getScholarships } from "@/lib/scholarshipStorage";
 import { getProfile } from "@/lib/profileStorage";
 import { computeMatchesForUser, getCachedMatches, GREENLIGHT_MIN_SCORE } from "@/lib/matchEngine";
 import { useUser } from "@/hooks/useUser";
-import { decodeHtmlEntities } from "@/lib/utils";
+import { decodeHtmlEntities, displayScholarshipTitle } from "@/lib/utils";
 import type { Application, Scholarship } from "@/types";
 
 export default function DeadlinesPage() {
@@ -137,12 +137,7 @@ export default function DeadlinesPage() {
   const hasRecommended = recommendedDueSoon.length > 0;
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-48 rounded-2xl" />
-      </div>
-    );
+    return <LoadingScreenBlock message="Loading deadlines…" />;
   }
 
   return (
@@ -161,7 +156,7 @@ export default function DeadlinesPage() {
               <Card key={scholarship.id} className="p-4 flex flex-col">
                 <div className="flex items-start justify-between gap-2">
                   <Link href={`/app/scholarships/${scholarship.id}`} className="font-medium text-[var(--text)] hover:text-amber-400 line-clamp-2">
-                    {decodeHtmlEntities(scholarship.title)}
+                    {displayScholarshipTitle(scholarship.title)}
                   </Link>
                   <span className="shrink-0 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold px-2 py-0.5">
                     {matchScore}% match

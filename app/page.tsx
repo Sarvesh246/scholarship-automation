@@ -729,9 +729,9 @@ export default function LandingPage() {
             <div>
               <h4 className="font-semibold mb-4 text-sm text-[var(--text)]">Legal</h4>
               <ul className="space-y-2 text-sm text-[var(--muted-2)]">
-                <li><span className="cursor-default">Privacy Policy</span></li>
-                <li><span className="cursor-default">Terms of Service</span></li>
-                <li><span className="cursor-default">Cookie Policy</span></li>
+                <li><Link href="/legal/privacy" className="hover:text-[var(--primary)] transition-colors">Privacy Policy</Link></li>
+                <li><Link href="/legal/terms" className="hover:text-[var(--primary)] transition-colors">Terms of Service</Link></li>
+                <li><Link href="/legal/cookies" className="hover:text-[var(--primary)] transition-colors">Cookie Policy</Link></li>
               </ul>
             </div>
           </div>

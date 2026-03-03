@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getApplication, saveApplication, deleteApplication, updateApplicationStatus, updateApplicationPromptResponses, updateApplicationDocs, updateApplicationLastViewed } from "@/lib/applicationStorage";
+import { getApplication, saveApplication, deleteApplication, updateApplicationStatus, updateApplicationPromptResponses, updateApplicationDocs, updateApplicationLastViewed, updateApplicationOutcome } from "@/lib/applicationStorage";
 import { getScholarship } from "@/lib/scholarshipStorage";
 import { getEssays } from "@/lib/essayStorage";
 import { matchEssaysToPrompt } from "@/lib/essayMatching";
+import { getApplicationBreakdown } from "@/lib/applicationBreakdown";
+import { getApplyUrl } from "@/lib/applyUrl";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -14,10 +16,11 @@ import { Checklist } from "@/components/feature/Checklist";
 import { DocumentSlot } from "@/components/feature/DocumentSlot";
 import { PromptBlock } from "@/components/feature/PromptBlock";
 import { Modal } from "@/components/ui/Modal";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { LoadingScreenBlock } from "@/components/ui/LoadingScreen";
 import { useToast } from "@/components/ui/Toast";
 import type { Application, Scholarship, Essay } from "@/types";
-import { decodeHtmlEntities } from "@/lib/utils";
+import { decodeHtmlEntities, displayScholarshipTitle } from "@/lib/utils";
+import { formatScholarshipDescription } from "@/lib/formatScholarshipDescription";
 
 type StepKey = "overview" | "eligibility" | "documents" | "prompts" | "final";
 
@@ -90,17 +93,17 @@ export default function ApplicationWorkspaceClient() {
     });
   };
 
+  const applyUrl = getApplyUrl(scholarship);
+
+  const handleSetOutcome = async (outcome: "awaiting" | "won" | "rejected") => {
+    await updateApplicationOutcome(id, outcome);
+    const updated = await getApplication(id);
+    setApplication(updated);
+    showToast({ title: "Result updated", variant: "success" });
+  };
+
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid gap-6 md:grid-cols-3">
-          <Skeleton className="h-48 rounded-2xl" />
-          <Skeleton className="h-48 rounded-2xl" />
-          <Skeleton className="h-48 rounded-2xl" />
-        </div>
-      </div>
-    );
+    return <LoadingScreenBlock message="Loading application…" />;
   }
 
   if (!application || !scholarship) {
@@ -123,10 +126,12 @@ export default function ApplicationWorkspaceClient() {
     { key: "final", label: "Final review" }
   ];
 
+  const breakdown = getApplicationBreakdown(scholarship, application);
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title={decodeHtmlEntities(scholarship.title)}
+        title={displayScholarshipTitle(scholarship.title)}
         subtitle="Application workspace"
         primaryAction={
           <div className="flex gap-2">
@@ -142,6 +147,40 @@ export default function ApplicationWorkspaceClient() {
           </div>
         }
       />
+
+      {/* Application execution breakdown: completion %, checklist, key facts */}
+      <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-medium text-[var(--muted-2)] uppercase tracking-wide">Application progress</p>
+            <p className="mt-0.5 text-2xl font-bold font-heading text-amber-400">
+              You are {breakdown.completionPct}% complete
+            </p>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              Auto-filled from profile where possible · Complete the checklist below to submit.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right text-xs">
+              <p className="text-[var(--muted-2)]">Deadline</p>
+              <p className="font-semibold text-[var(--text)]">{breakdown.deadlineFormatted}</p>
+            </div>
+            <div className="text-right text-xs">
+              <p className="text-[var(--muted-2)]">Effort</p>
+              <p className="font-semibold text-[var(--text)]">{breakdown.effortLabel} · {breakdown.effortTier === "easy" ? "Easy" : breakdown.effortTier === "medium" ? "Medium" : "Heavy"}</p>
+            </div>
+            {breakdown.awardAmount > 0 && (
+              <div className="text-right text-xs">
+                <p className="text-[var(--muted-2)]">Award</p>
+                <p className="font-semibold text-emerald-500 dark:text-emerald-400">${breakdown.awardAmount.toLocaleString()}</p>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-amber-500/20">
+          <Checklist items={breakdown.checklistTasks} />
+        </div>
+      </div>
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.5fr)_minmax(0,0.9fr)]">
         <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 text-xs">
@@ -178,7 +217,7 @@ export default function ApplicationWorkspaceClient() {
               <h3 className="text-sm font-semibold font-heading">Overview</h3>
               {scholarship.description && (
                 <div className="text-xs text-[var(--text)] leading-relaxed whitespace-pre-line">
-                  {decodeHtmlEntities(scholarship.description)}
+                  {formatScholarshipDescription(decodeHtmlEntities(scholarship.description))}
                 </div>
               )}
               <p className="text-xs text-[var(--muted)]">
@@ -274,11 +313,29 @@ export default function ApplicationWorkspaceClient() {
                       }])
                 ]}
               />
-              <div className="rounded-xl bg-[var(--bg-secondary)] px-3 py-2 text-xs text-[var(--muted)]">
-                Export and submission are currently placeholders. Use this
-                checklist to confirm you are ready to submit on the official
-                scholarship website.
-              </div>
+              {applyUrl ? (
+                <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 space-y-3">
+                  <p className="text-sm font-medium text-amber-400">Submit on the official site</p>
+                  <p className="text-xs text-[var(--muted)]">
+                    Use the button below to open the scholarship&apos;s application page. Complete and submit there, then come back and mark as submitted here to track it.
+                  </p>
+                  <a
+                    href={applyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20"
+                  >
+                    Open application page
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
+              ) : (
+                <div className="rounded-xl bg-[var(--bg-secondary)] px-3 py-2 text-xs text-[var(--muted)]">
+                  No application link is stored for this scholarship. If you have the official apply URL, submit there, then mark as submitted below to track it.
+                </div>
+              )}
               <Button
                 type="button"
                 variant="secondary"
@@ -319,6 +376,27 @@ export default function ApplicationWorkspaceClient() {
                 })}
               </span>
             </div>
+            {application.status === "submitted" && !application.owlStatus && (
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <span className="text-[var(--muted-2)]">Result</span>
+                <div className="flex gap-1">
+                  {(["awaiting", "won", "rejected"] as const).map((o) => (
+                    <button
+                      key={o}
+                      type="button"
+                      onClick={() => handleSetOutcome(o)}
+                      className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                        application.outcome === o
+                          ? "bg-amber-500/20 text-amber-400"
+                          : "bg-[var(--bg-secondary)] text-[var(--muted)] hover:text-[var(--text)]"
+                      }`}
+                    >
+                      {o === "awaiting" ? "Awaiting" : o === "won" ? "Won" : "Rejected"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -326,11 +404,29 @@ export default function ApplicationWorkspaceClient() {
       <Modal
         open={confirmOpen}
         title="Mark as submitted?"
-        description="This won't actually send anything, but helps you track what's been submitted."
+        description={
+          applyUrl
+            ? "Have you submitted on the official site? Open the link below if you haven't yet, then mark as submitted here to track it."
+            : "This records that you've submitted elsewhere. We don't have a stored link for this scholarship."
+        }
         primaryLabel="Mark submitted"
         onClose={() => setConfirmOpen(false)}
         onPrimary={handleMarkSubmitted}
-      />
+      >
+        {applyUrl && (
+          <a
+            href={applyUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20 w-full justify-center"
+          >
+            Open application page
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        )}
+      </Modal>
       <Modal
         open={confirmDeleteOpen}
         title="Remove this application?"

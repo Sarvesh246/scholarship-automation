@@ -5,6 +5,7 @@ import { ReactNode } from "react";
 import { ToastProvider } from "@/components/ui/Toast";
 import { FirebaseAnalyticsInit } from "@/components/FirebaseAnalyticsInit";
 import { ThemeInit } from "@/components/ThemeInit";
+import { ScrapeJobPoller } from "@/components/ScrapeJobPoller";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <ThemeInit />
         <ToastProvider>
+          <ScrapeJobPoller />
           <FirebaseAnalyticsInit />
           {children}
         </ToastProvider>

@@ -3,6 +3,7 @@
  * Rule: if it cannot pass verification logic, it does not get shown.
  */
 import type { Scholarship } from "@/types";
+import { computeFundingType } from "./scholarshipDefinition";
 
 export type VerificationStatus = "approved" | "needs_review" | "hidden" | "flagged";
 export type DisplayCategory =
@@ -197,6 +198,73 @@ export function getVerificationStatus(
   return "hidden";
 }
 
+/** Hash for duplicate detection (title + sponsor + deadline + amount). */
+export function scholarshipHash(s: Scholarship): string {
+  const t = (s.title ?? "").trim().toLowerCase();
+  const o = (s.sponsor ?? "").trim().toLowerCase();
+  const d = (s.deadline ?? "").replace(/T.*$/, "").trim();
+  const a = String(s.amount ?? 0);
+  return `${t}|${o}|${d}|${a}`;
+}
+
+/** Quality tier for display badge: high (70+), medium (50–69), low (&lt;50). */
+export function getQualityTier(qualityScore: number | undefined): "high" | "medium" | "low" {
+  const q = qualityScore ?? 0;
+  if (q >= MIN_SCORE_APPROVED) return "high";
+  if (q >= MIN_SCORE_REVIEW) return "medium";
+  return "low";
+}
+
+/** Minimum score for "Higher quality only" filter (stricter than feed minimum). 85+ = top tier. */
+export const MIN_SCORE_HIGH_QUALITY_ONLY = 85;
+
+/** Human-readable warnings for display (tooltip or detail page). Keeps UI minimal. */
+export function getQualityWarnings(s: Scholarship): string[] {
+  const w: string[] = [];
+  if (!s.deadline || (s.deadline ?? "").trim().length === 0) w.push("Missing deadline");
+  else {
+    const d = new Date((s.deadline ?? "").replace(/T.*$/, "").trim());
+    if (isNaN(d.getTime()) || d < new Date()) w.push("Invalid or past deadline");
+  }
+  if (!(s.sponsor ?? "").trim() || (s.sponsor ?? "").trim().length < 3) w.push("Unknown sponsor");
+  if (!s.applicationUrl && !(s.description ?? "").match(/https?:\/\//)) w.push("No application link");
+  if ((s.domainTrustScore ?? 0) < MIN_DOMAIN_TRUST && (s.sponsor ?? "").length > 0) w.push("Unverified source");
+  if (s.riskFlags?.includes("potential_risk") || s.verificationStatus === "flagged") w.push("Potential risk");
+  return w;
+}
+
+/** Human-readable "Why this score?" breakdown for the Quality badge. */
+export function getQualityBreakdown(s: Scholarship): { score: number; reasons: string[] } {
+  const score = s.qualityScore ?? 0;
+  const reasons: string[] = [];
+  const deadline = s.deadline && /^\d{4}-\d{2}-\d{2}/.test(String(s.deadline));
+  if (deadline) reasons.push("Deadline verified");
+  if ((s.sponsor ?? "").trim().length >= 3) reasons.push("Sponsor confirmed");
+  else reasons.push("Sponsor unknown");
+  if (typeof s.amount === "number" && s.amount > 0) reasons.push("Award amount clear");
+  else reasons.push("Award amount unclear");
+  const riskFlags = s.riskFlags ?? [];
+  if (riskFlags.length === 0 && s.verificationStatus !== "flagged") reasons.push("No suspicious signals");
+  else if (riskFlags.length > 0) reasons.push("Some verification notes");
+  if ((s.domainTrustScore ?? 0) >= MIN_DOMAIN_TRUST) reasons.push("Trusted source");
+  return { score, reasons };
+}
+
+/** Risk flags for ranking/filtering. Used by runQualityVerification. */
+export function computeRiskFlags(s: Scholarship, domainTrust: number): string[] {
+  const flags: string[] = [];
+  if (!s.deadline || (s.deadline ?? "").trim().length === 0) flags.push("missing_deadline");
+  if (typeof s.amount !== "number" || s.amount <= 0) flags.push("missing_award");
+  const desc = (s.description ?? "").toLowerCase();
+  if (/pay\s+to\s+apply|application\s+fee|fee\s+required/i.test(desc)) flags.push("pay_required");
+  if (/bank\s+account|routing|wire\s+transfer|ssn|social\s+security/i.test(desc)) flags.push("sensitive_info");
+  if (domainTrust < 3) flags.push("suspicious_domain");
+  if (!(s.sponsor ?? "").trim() || (s.sponsor ?? "").trim().length < 2) flags.push("missing_sponsor");
+  if (detectScamPatterns(s)) flags.push("potential_risk");
+  if (flagUnrealisticAward(s)) flags.push("unrealistic_award");
+  return flags;
+}
+
 /** Full quality run: returns fields to persist on the scholarship. */
 export function runQualityVerification(s: Scholarship): {
   qualityScore: number;
@@ -206,7 +274,19 @@ export function runQualityVerification(s: Scholarship): {
   lastVerifiedAt: string;
   shouldHide: boolean;
   flags: string[];
+  riskFlags: string[];
+  qualityTier: "high" | "medium" | "low";
+  fundingType: import("@/types").FundingType;
+  scholarshipScore: number;
 } {
+  const funding = computeFundingType({
+    title: s.title,
+    description: s.description,
+    amount: s.amount,
+    source: s.source,
+    eligibilityTags: s.eligibilityTags,
+    prompts: s.prompts,
+  });
   const flags: string[] = [];
   const legit = failsLegitimacy(s);
   if (legit.reject) {
@@ -218,6 +298,10 @@ export function runQualityVerification(s: Scholarship): {
       lastVerifiedAt: new Date().toISOString(),
       shouldHide: true,
       flags: [legit.reason ?? "failed_legitimacy"],
+      riskFlags: [legit.reason ?? "failed_legitimacy"],
+      qualityTier: "low",
+      fundingType: funding.fundingType,
+      scholarshipScore: funding.scholarshipScore,
     };
   }
   const domainTrustScore = scoreDomainTrust(s);
@@ -227,7 +311,10 @@ export function runQualityVerification(s: Scholarship): {
   if (domainTrustScore < MIN_DOMAIN_TRUST) flags.push("low_domain_trust");
   const qualityScore = computeQualityScore(s, domainTrustScore);
   const verificationStatus = getVerificationStatus(s, qualityScore, scamFlagged, false);
-  const shouldHide = verificationStatus === "hidden" || verificationStatus === "flagged";
+  let shouldHide = verificationStatus === "hidden" || verificationStatus === "flagged";
+  if (!funding.showInMainFeed) shouldHide = true;
+  const riskFlags = computeRiskFlags(s, domainTrustScore);
+  const qualityTier = getQualityTier(qualityScore);
   return {
     qualityScore,
     verificationStatus,
@@ -236,16 +323,11 @@ export function runQualityVerification(s: Scholarship): {
     lastVerifiedAt: new Date().toISOString(),
     shouldHide,
     flags,
+    riskFlags,
+    qualityTier,
+    fundingType: funding.fundingType,
+    scholarshipScore: funding.scholarshipScore,
   };
-}
-
-/** Hash for duplicate detection (title + sponsor + deadline + amount). */
-export function scholarshipHash(s: Scholarship): string {
-  const t = (s.title ?? "").trim().toLowerCase();
-  const o = (s.sponsor ?? "").trim().toLowerCase();
-  const d = (s.deadline ?? "").replace(/T.*$/, "").trim();
-  const a = String(s.amount ?? 0);
-  return `${t}|${o}|${d}|${a}`;
 }
 
 /** Simple similarity: 0–1. Used to merge duplicates at 80%+. */

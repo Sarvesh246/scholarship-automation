@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Switch } from "@/components/ui/Switch";
@@ -115,22 +116,25 @@ export default function SettingsPage() {
       />
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="flex h-full min-h-0 flex-col space-y-4 p-4">
-          <h3 className="text-sm font-semibold font-heading shrink-0">Theme</h3>
-          <div className="flex flex-wrap gap-2">
-            {(["light", "dark"] as const).map((t) => (
-              <Button
-                key={t}
-                type="button"
-                variant={theme === t ? "primary" : "secondary"}
-                size="sm"
-                onClick={() => handleTheme(t)}
-              >
-                {t === "light" ? "Light" : "Dark"}
-              </Button>
-            ))}
+        <Card className="flex h-full min-h-0 flex-col p-4">
+          <h3 className="text-sm font-semibold font-heading shrink-0 mb-3">Theme</h3>
+          <div className="flex flex-1 min-h-0 flex-col justify-center gap-3">
+            <div className="flex gap-2 w-full">
+              {(["light", "dark"] as const).map((t) => (
+                <Button
+                  key={t}
+                  type="button"
+                  variant={theme === t ? "primary" : "secondary"}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => handleTheme(t)}
+                >
+                  {t === "light" ? "Light" : "Dark"}
+                </Button>
+              ))}
+            </div>
+            <p className="text-[10px] text-[var(--muted-2)]">Applies immediately across the app.</p>
           </div>
-          <p className="text-[10px] text-[var(--muted-2)] shrink-0">Applies immediately across the app.</p>
         </Card>
 
         <Card className="flex h-full min-h-0 flex-col space-y-4 p-4">
@@ -174,27 +178,28 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        <Card className="flex h-full min-h-0 flex-col space-y-4 p-4">
-          <h3 className="text-sm font-semibold font-heading shrink-0">Account</h3>
-          <div className="flex flex-1 min-h-0 flex-col">
-            <div className="flex items-center gap-3 min-w-0">
+        <Card className="flex h-full min-h-0 flex-col p-4">
+          <h3 className="text-sm font-semibold font-heading shrink-0 mb-3">Account</h3>
+          <div className="flex flex-1 min-h-0 flex-col gap-4">
+            <div className="flex items-center gap-3 min-w-0 flex-shrink-0">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-sm font-bold text-white">
                 {initials}
               </div>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 overflow-hidden">
                 <p className="truncate text-xs font-medium text-[var(--text)]">{displayName || "No name set"}</p>
                 <p className="truncate text-[10px] text-[var(--muted-2)]">{email || "No email"}</p>
               </div>
             </div>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={handleSignOut}
-              className="mt-auto shrink-0"
-            >
-              Sign out
-            </Button>
+            <div className="pt-2 shrink-0">
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={handleSignOut}
+              >
+                Sign out
+              </Button>
+            </div>
           </div>
         </Card>
 
@@ -215,14 +220,28 @@ export default function SettingsPage() {
           </Button>
         </Card>
 
-        <Card className="flex h-full min-h-0 flex-col space-y-4 p-4 md:col-span-2 border-2 border-red-500/30 bg-red-500/5 rounded-xl">
-          <h3 className="text-sm font-semibold font-heading text-red-400 shrink-0">Danger zone</h3>
-          <p className="text-xs text-[var(--muted-2)]">
-            Permanently delete your account and all your data. This cannot be undone.
+        <Card className="flex h-full min-h-0 flex-col space-y-4 p-4">
+          <h3 className="text-sm font-semibold font-heading shrink-0">Feedback</h3>
+          <p className="text-[10px] text-[var(--muted-2)] flex-1 min-h-0">
+            Bug reports, suggestions, or general feedback. We review everything.
           </p>
-          <p className="text-[11px] text-red-400/80">
-            After deletion you will be signed out and cannot recover your profile, applications, or essays.
-          </p>
+          <Link href="/app/feedback">
+            <Button type="button" variant="secondary" size="sm" className="shrink-0">
+              Submit feedback
+            </Button>
+          </Link>
+        </Card>
+
+        <Card className="danger-zone-card flex min-h-0 flex-col gap-4 p-4 md:col-span-2">
+          <h3 className="danger-zone-title text-sm font-semibold font-heading shrink-0">Danger zone</h3>
+          <div className="space-y-2">
+            <p className="text-xs text-[var(--muted-2)]">
+              Permanently delete your account and all your data. This cannot be undone.
+            </p>
+            <p className="danger-zone-muted text-[11px]">
+              After deletion you will be signed out and cannot recover your profile, applications, or essays.
+            </p>
+          </div>
           <Button
             type="button"
             variant="destructive"

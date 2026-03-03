@@ -1,6 +1,6 @@
 /**
  * Scrape professional licensing boards and associations (state bar, medical boards, CPA, nursing, etc.).
- * Tag: professional_association
+ * Scrapes every URL in the list. Tag: professional_association
  */
 import { scrapeSeedUrls, type SeedUrlConfig } from "./seedUrlScraper";
 import type { ScrapedScholarship } from "./types";
@@ -13,9 +13,8 @@ const PROFESSIONAL_ASSOCIATION_SEED_URLS: SeedUrlConfig[] = [
   { url: "https://www.nspe.org/resources/students/scholarships", sponsor: "National Society of Professional Engineers" },
 ];
 
-export async function scrapeProfessionalAssociations(maxPages = 5): Promise<ScrapedScholarship[]> {
-  const urls = PROFESSIONAL_ASSOCIATION_SEED_URLS.slice(0, Math.min(maxPages, PROFESSIONAL_ASSOCIATION_SEED_URLS.length));
-  return scrapeSeedUrls(urls, {
+export async function scrapeProfessionalAssociations(_maxPages = 5): Promise<ScrapedScholarship[]> {
+  return scrapeSeedUrls(PROFESSIONAL_ASSOCIATION_SEED_URLS, {
     sourceType: "professional_association",
     idPrefix: "proassoc",
     maxPerPage: 20,

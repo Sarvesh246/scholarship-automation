@@ -136,7 +136,7 @@ export default function AdminModerationPage() {
         {loading ? (
           <Skeleton className="h-48" />
         ) : items.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">No submissions yet. Users can submit via the Submit a scholarship form.</p>
+          <p className="text-sm text-[var(--muted)]">No submissions yet. Organizations add scholarships via the form in the app.</p>
         ) : (
           <div className="space-y-3">
             {items.map((item) => {

@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
 import { getCachedDetail, setCachedDetail } from "@/lib/scholarshipCache";
 import { logFirestoreRead } from "@/lib/firestoreReadLog";
-import { isInstitutionalGrant, isOverMaxPrize } from "@/lib/institutionalGrantFilter";
+import { isInstitutionalGrant, isNonStudentTargetedGrant, isStudentTargetedGrant } from "@/lib/institutionalGrantFilter";
 import { MIN_SCORE_APPROVED } from "@/lib/scholarshipQuality";
-import type { Scholarship } from "@/types";
+import type { Scholarship, FundingType } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +22,12 @@ function passesQuality(s: Scholarship): boolean {
   if (s.verificationStatus === "hidden" || s.verificationStatus === "flagged" || s.verificationStatus === "needs_review") return false;
   if (s.verificationStatus === undefined && s.qualityScore === undefined) return true;
   return (s.qualityScore ?? 0) >= MIN_SCORE_APPROVED;
+}
+
+function showInMainFeed(s: Scholarship): boolean {
+  const ft = s.fundingType as FundingType | undefined;
+  if (ft === "institutional_grant" || ft === "research_grant" || ft === "government_program") return false;
+  return true;
 }
 
 /**
@@ -53,7 +59,10 @@ export async function GET(
     }
 
     const s = { id: snap.id, ...snap.data() } as Scholarship;
-    if (isJunk(s) || isInstitutionalGrant(s) || isOverMaxPrize(s)) {
+    if (isJunk(s) || isInstitutionalGrant(s) || isNonStudentTargetedGrant(s) || !isStudentTargetedGrant(s)) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (!showInMainFeed(s)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     if (!passesQuality(s)) {

@@ -18,7 +18,7 @@ import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { Button } from "@/components/ui/Button";
 import { Tag } from "@/components/ui/Tag";
 import { Modal } from "@/components/ui/Modal";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { LoadingScreenBlock } from "@/components/ui/LoadingScreen";
 import { useToast } from "@/components/ui/Toast";
 
 const AUTOSAVE_DELAY_MS = 1500;
@@ -90,11 +90,16 @@ export default function EssayEditorClient() {
       return saved;
     } catch {
       setSaveStatus("unsaved");
+      showToast({
+        title: "Autosave failed",
+        message: "Click Save to retry, or check your connection.",
+        variant: "danger",
+      });
       return null;
     } finally {
       savingRef.current = false;
     }
-  }, [essayId, title, tags, content, isNew, router]);
+  }, [essayId, title, tags, content, isNew, router, showToast]);
 
   useEffect(() => {
     if (loading) return;
@@ -189,15 +194,7 @@ export default function EssayEditorClient() {
     saveStatus === "unsaved" ? "Unsaved changes" : "Autosave on";
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid gap-6 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-          <Skeleton className="h-72 rounded-2xl" />
-          <Skeleton className="h-40 rounded-2xl" />
-        </div>
-      </div>
-    );
+    return <LoadingScreenBlock message="Loading essay…" />;
   }
 
   return (

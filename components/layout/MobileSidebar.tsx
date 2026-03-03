@@ -44,7 +44,7 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
       {/* Drawer */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-4 transition-transform duration-200 ease-in-out md:hidden",
+          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-[var(--border)] bg-[var(--sidebar-bg)] px-4 py-4 transition-transform duration-200 ease-in-out md:hidden",
           open ? "translate-x-0" : "-translate-x-full"
         )}
         aria-label="Mobile navigation"
@@ -83,11 +83,11 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
                 className={cn(
                   "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[var(--muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]",
                   active &&
-                    "bg-[var(--primary-soft)] text-amber-400 hover:bg-[var(--primary-soft)] hover:text-amber-400"
+                    "bg-[var(--nav-active-bg)] text-[var(--nav-active-text)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-active-text)]"
                 )}
               >
                 {active && (
-                  <span className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-amber-500" />
+                  <span className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-[var(--nav-active-border)]" />
                 )}
                 {item.icon}
                 <span>{item.label}</span>
@@ -100,11 +100,11 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
               className={cn(
                 "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[var(--muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]",
                 pathname?.startsWith("/app/admin") &&
-                  "bg-[var(--primary-soft)] text-amber-400 hover:bg-[var(--primary-soft)] hover:text-amber-400"
+                  "bg-[var(--nav-active-bg)] text-[var(--nav-active-text)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-active-text)]"
               )}
             >
               {pathname?.startsWith("/app/admin") && (
-                <span className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-amber-500" />
+                <span className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-[var(--nav-active-border)]" />
               )}
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -118,7 +118,7 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
         <div className="mt-4 space-y-3 border-t border-[var(--border)] pt-4 text-xs">
           <div className="flex items-center justify-between rounded-lg bg-[var(--surface)] px-3 py-2">
             <span className="text-[var(--muted-2)]">Plan</span>
-            <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+            <span className="rounded-full bg-[var(--nav-active-bg)] border border-[var(--primary)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--nav-active-text)]">
               Free
             </span>
           </div>

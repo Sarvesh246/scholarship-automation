@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/requireAdminAuth";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
 import { enrichWithClassification } from "@/lib/classifyScholarship";
+import { formatScholarshipDescription } from "@/lib/formatScholarshipDescription";
 import { MAX_PRIZE_AMOUNT } from "@/lib/institutionalGrantFilter";
 import type { Scholarship } from "@/types";
 
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
     const sponsor = String(body.sponsor ?? "").trim();
     const amount = Number(body.amount);
     const deadline = String(body.deadline ?? "").trim();
-    const description = String(body.description ?? "").trim();
+    const description = formatScholarshipDescription(String(body.description ?? "").trim());
     const estimatedTime = String(body.estimatedTime ?? "2–3 hours").trim();
     const categoryTags = Array.isArray(body.categoryTags) ? body.categoryTags : [];
     const eligibilityTags = Array.isArray(body.eligibilityTags) ? body.eligibilityTags : [];

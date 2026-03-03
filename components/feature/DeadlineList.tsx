@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { decodeHtmlEntities } from "@/lib/utils";
+import { decodeHtmlEntities, displayScholarshipTitle } from "@/lib/utils";
 
 interface DeadlineItem {
   id: string;
@@ -56,7 +56,7 @@ export function DeadlineList({ groups, onResume }: DeadlineListProps) {
                       {date}
                     </span>
                     <div>
-                      <p className="font-medium leading-snug">{decodeHtmlEntities(item.title)}</p>
+                      <p className="font-medium leading-snug">{displayScholarshipTitle(item.title)}</p>
                       <div className="mt-1 flex items-center gap-2 text-[10px] text-[var(--muted-2)]">
                         <Badge
                           variant={

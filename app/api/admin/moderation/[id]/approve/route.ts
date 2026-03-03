@@ -3,6 +3,7 @@ import { requireAdminAuth } from "@/lib/requireAdminAuth";
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { enrichWithClassification } from "@/lib/classifyScholarship";
+import { formatScholarshipDescription } from "@/lib/formatScholarshipDescription";
 import { MAX_PRIZE_AMOUNT } from "@/lib/institutionalGrantFilter";
 import type { Scholarship } from "@/types";
 
@@ -38,7 +39,7 @@ export async function POST(
       return NextResponse.json({ error: `Amount cannot exceed $${MAX_PRIZE_AMOUNT.toLocaleString()}` }, { status: 400 });
     }
     const deadline = (data.deadline && String(data.deadline).trim()) || "2026-12-31";
-    const description = String(data.description ?? "").trim();
+    const description = formatScholarshipDescription(String(data.description ?? "").trim());
     const applicationUrl = data.applicationUrl && String(data.applicationUrl).trim() ? String(data.applicationUrl).trim() : null;
 
     const baseId = slugify(title) || "user-submission";

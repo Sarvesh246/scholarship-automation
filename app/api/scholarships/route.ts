@@ -3,13 +3,13 @@ import { FieldPath, type QueryDocumentSnapshot } from "firebase-admin/firestore"
 import { getAdminFirestore } from "@/lib/firebaseAdmin";
 import { getCachedList, setCachedList, listCacheKey } from "@/lib/scholarshipCache";
 import { logFirestoreRead } from "@/lib/firestoreReadLog";
-import { isInstitutionalGrant, isOverMaxPrize } from "@/lib/institutionalGrantFilter";
+import { isInstitutionalGrant, isNonStudentTargetedGrant, isStudentTargetedGrant } from "@/lib/institutionalGrantFilter";
 import { MIN_SCORE_APPROVED } from "@/lib/scholarshipQuality";
-import type { Scholarship } from "@/types";
+import type { Scholarship, FundingType } from "@/types";
 
 export const dynamic = "force-dynamic";
 
-const MAX_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
 const JUNK_IDS = new Set(["bold-by-state", "bold-by-major", "bold-by-year", "bold-by-demographics"]);
 const JUNK_TITLE = /^By\s+(Demographics|Major|Year|State)$/i;
 
@@ -29,6 +29,13 @@ function passesQuality(s: Scholarship): boolean {
   if (s.verificationStatus === "hidden" || s.verificationStatus === "flagged" || s.verificationStatus === "needs_review") return false;
   if (s.verificationStatus === undefined && s.qualityScore === undefined) return true;
   return (s.qualityScore ?? 0) >= MIN_SCORE_APPROVED;
+}
+
+/** Main feed shows only individual scholarships/fellowships; hide institutional/federal grants. */
+function showInMainFeed(s: Scholarship): boolean {
+  const ft = s.fundingType as FundingType | undefined;
+  if (ft === "institutional_grant" || ft === "research_grant" || ft === "government_program") return false;
+  return true; // scholarship, fellowship, or undefined (legacy)
 }
 
 /**
@@ -77,8 +84,9 @@ export async function GET(request: NextRequest) {
     let lastDoc: QueryDocumentSnapshot | null = null;
     for (const doc of snap.docs) {
       const s = { id: doc.id, ...doc.data() } as Scholarship;
-      if (isJunk(s) || isInstitutionalGrant(s) || isOverMaxPrize(s)) continue;
+      if (isJunk(s) || isInstitutionalGrant(s) || isNonStudentTargetedGrant(s) || !isStudentTargetedGrant(s)) continue;
       if (s.status === "draft") continue;
+      if (!showInMainFeed(s)) continue;
       if (!passesQuality(s)) continue;
       items.push(s);
       lastDoc = doc;
@@ -86,7 +94,7 @@ export async function GET(request: NextRequest) {
     }
 
     const nextCursor =
-      lastDoc && snap.docs.length >= limit * 3
+      lastDoc
         ? Buffer.from(`${(lastDoc.data() as { deadline?: string }).deadline ?? ""}|${lastDoc.id}`, "utf8").toString("base64url")
         : null;
 

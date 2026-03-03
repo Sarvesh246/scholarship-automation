@@ -8,7 +8,10 @@ import { SCRAPER_HEADERS, parseDeadline, delay } from "./shared";
 
 const BASE_URL = "https://scholarships360.org";
 
-export async function scrapeScholarships360(maxPages = 3): Promise<ScrapedScholarship[]> {
+const SKIP_SLUGS = new Set(["search", "scholarship-winners", "our-partners"]);
+const SKIP_TITLES = ["student-centric", "advertiser disclosure", "why choose", "scholarship review", "explore vetted"];
+
+export async function scrapeScholarships360(maxPages = 10): Promise<ScrapedScholarship[]> {
   const results: ScrapedScholarship[] = [];
   const seen = new Set<string>();
 
@@ -21,13 +24,13 @@ export async function scrapeScholarships360(maxPages = 3): Promise<ScrapedSchola
       if (!res.ok) break;
       const html = await res.text();
       const $ = cheerio.load(html);
+      let added = 0;
 
       $('a[href*="/scholarships/"]').each((_, el) => {
         const href = $(el).attr("href") ?? "";
         const match = href.match(/\/scholarships\/(?:search\/)?([^/?#]+)\/?$/);
         const slug = match?.[1] ?? "";
-        if (!slug || seen.has(slug)) return;
-        if (["search", "scholarship-winners", "our-partners"].includes(slug)) return;
+        if (!slug || seen.has(slug) || SKIP_SLUGS.has(slug)) return;
 
         const card = $(el).closest("article, [class*='card'], [class*='scholarship'], div");
         const block = card.length ? card.first() : $(el).parent();
@@ -39,23 +42,22 @@ export async function scrapeScholarships360(maxPages = 3): Promise<ScrapedSchola
           .replace(/\s+/g, " ")
           .split(/\n/)[0]
           .trim();
-        const skipTitles = ["student-centric", "advertiser disclosure", "why choose", "scholarship review", "explore vetted"];
-        if (skipTitles.some((s) => rawTitle.toLowerCase().includes(s))) return;
+        if (SKIP_TITLES.some((s) => rawTitle.toLowerCase().includes(s))) return;
         if (rawTitle.length < 15) return;
 
         seen.add(slug);
-        const title = rawTitle;
+        added++;
 
         const amount = parseAmountFromText(text);
         const deadline = parseDeadline(text);
         if (amount === 0 && !text.includes("award")) return;
 
         const fullUrl = href.startsWith("http") ? href : `${BASE_URL}${href.startsWith("/") ? "" : "/"}${href}`;
-        const desc = text.slice(0, 400).trim() || `${title}. Apply at ${fullUrl}`;
+        const desc = text.slice(0, 400).trim() || `${rawTitle}. Apply at ${fullUrl}`;
 
         results.push({
           id: `scholarships360-${slug}`,
-          title,
+          title: rawTitle,
           sponsor: "Scholarships360",
           amount: amount || 1000,
           deadline,
@@ -64,6 +66,7 @@ export async function scrapeScholarships360(maxPages = 3): Promise<ScrapedSchola
       });
 
       await delay(1200);
+      if (added === 0) break;
     } catch (e) {
       console.error("[scraper] scholarships360 page failed:", page, e);
     }

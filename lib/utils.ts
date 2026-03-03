@@ -26,3 +26,13 @@ export function decodeHtmlEntities(text: string): string {
     .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCodePoint(parseInt(code, 16)));
 }
 
+/** Remove common verification boilerplate that appears in scholarship titles from external sources. */
+const VERIFICATION_PHRASE = /\s*\.?\s*This scholarship has been verified by the scholarship providing organization\.?\s*/gi;
+
+/** For display: decode HTML entities and strip verification boilerplate from scholarship titles. */
+export function displayScholarshipTitle(title: string | undefined | null): string {
+  if (!title || typeof title !== "string") return "";
+  const decoded = decodeHtmlEntities(title);
+  return decoded.replace(VERIFICATION_PHRASE, " ").replace(/\s+/g, " ").trim();
+}
+

@@ -8,13 +8,14 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { PipelineBoard } from "@/components/feature/PipelineBoard";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { LoadingScreenBlock } from "@/components/ui/LoadingScreen";
 import { getApplications, ensureApplication } from "@/lib/applicationStorage";
 import { getScholarships } from "@/lib/scholarshipStorage";
 import { getProfile } from "@/lib/profileStorage";
 import { computeMatchesForUser, getCachedMatches, invalidateMatchCache, GREENLIGHT_MIN_SCORE } from "@/lib/matchEngine";
+import { parseEffortMinutes } from "@/lib/opportunityScore";
 import { useUser } from "@/hooks/useUser";
-import { decodeHtmlEntities } from "@/lib/utils";
+import { decodeHtmlEntities, displayScholarshipTitle } from "@/lib/utils";
 import type { Application, Scholarship } from "@/types";
 
 function getDeadlinesForNextDays<T extends { deadline: string }>(
@@ -102,7 +103,7 @@ export default function DashboardPage() {
                 : "not_started";
           return {
             id: app.id,
-            title: s?.title ?? "Application",
+            title: displayScholarshipTitle(s?.title ?? "") || "Application",
             scholarshipId: app.scholarshipId,
             deadline: s?.deadline ?? "",
             status: deadlineStatus
@@ -134,13 +135,18 @@ export default function DashboardPage() {
   );
 
   const applicationIds = useMemo(() => new Set(applications.map((a) => a.scholarshipId)), [applications]);
+  // Same formula as scholarships page Greenlight: eligible or almost_eligible, score >= 70, exclude sweepstakes, exclude already applied
   const greenlightEligibleCount = useMemo(() => {
-    return matchResults.filter(
-      (r) =>
-        (r.eligibilityStatus === "eligible" || r.eligibilityStatus === "almost_eligible" || r.eligibilityStatus === "may_not_be_eligible") &&
-        r.matchScore >= GREENLIGHT_MIN_SCORE
-    ).length;
-  }, [matchResults]);
+    return matchResults.filter((r) => {
+      if (applicationIds.has(r.id)) return false;
+      const scholarship = scholarships.find((s) => s.id === r.id);
+      if (scholarship?.displayCategory === "sweepstakes") return false;
+      const ok =
+        (r.eligibilityStatus === "eligible" || r.eligibilityStatus === "almost_eligible") &&
+        r.matchScore >= GREENLIGHT_MIN_SCORE;
+      return ok;
+    }).length;
+  }, [matchResults, scholarships, applicationIds]);
   const topRecommended = useMemo(() => {
     const notStarted = scholarships.filter((s) => !applicationIds.has(s.id));
     const withScores = notStarted
@@ -156,19 +162,30 @@ export default function DashboardPage() {
     return withScores.slice(0, 3);
   }, [scholarships, applicationIds, matchResults]);
 
+  // Weekly planning: same 3 as "Top recommended" so banner $ and cards $ match
+  const weeklyPlanning = useMemo(() => {
+    if (topRecommended.length < 2) return { count: 0, hours: 0, potentialSum: 0 };
+    const take = topRecommended.slice(0, 3);
+    const totalMinutes = take.reduce((acc, { scholarship }) => acc + parseEffortMinutes(scholarship.estimatedTime), 0);
+    const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
+    const potentialSum = take.reduce((acc, { scholarship }) => acc + (scholarship.amount ?? 0), 0);
+    return { count: take.length, hours: totalHours, potentialSum };
+  }, [topRecommended]);
+
   const pipelineCards = useMemo(
     () =>
       applications.map((app) => {
         const scholarship = scholarships.find((s) => s.id === app.scholarshipId);
         return {
           id: app.id,
-          title: scholarship?.title ?? "Application",
+          title: displayScholarshipTitle(scholarship?.title ?? "") || "Application",
           amount: scholarship?.amount,
           deadline: scholarship?.deadline,
           status: app.status,
           progress: app.progress,
           nextTask: app.nextTask,
-          owlStatus: app.owlStatus
+          owlStatus: app.owlStatus,
+          outcome: app.outcome,
         };
       }),
     [applications, scholarships]
@@ -198,11 +215,11 @@ export default function DashboardPage() {
 
   const statCards = [
     {
-      label: "You qualify for",
+      label: "Curated for you",
       value: greenlightEligibleCount,
       sub: "scholarships",
-      zeroCopy: "No exact matches yet",
-      zeroSub: "Add location + activities to unlock more.",
+      zeroCopy: "No curated matches yet",
+      zeroSub: "Add location + activities to grow your list.",
       zeroActionHref: "/app/profile",
       zeroActionLabel: "Improve profile",
       icon: (
@@ -238,7 +255,6 @@ export default function DashboardPage() {
       label: "Estimated $ applied",
       value: `$${estimatedSum.toLocaleString()}`,
       sub: potentialEligibleSum > 0 ? `Up to $${(potentialEligibleSum / 1000).toFixed(0)}k more to discover` : null,
-      subWhenZero: estimatedSum === 0 && potentialEligibleSum > 0 ? `Potential $ eligible: $${potentialEligibleSum.toLocaleString()}` : null,
       icon: (
         <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -249,17 +265,7 @@ export default function DashboardPage() {
   ];
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid gap-4 md:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-20 rounded-2xl" />
-          ))}
-        </div>
-        <Skeleton className="h-48 rounded-2xl" />
-      </div>
-    );
+    return <LoadingScreenBlock message="Loading dashboard…" />;
   }
 
   return (
@@ -293,13 +299,13 @@ export default function DashboardPage() {
           return (
           <Card
             key={stat.label}
-            className={`h-full min-h-[96px] p-3 sm:p-4 flex ${isFirst ? "ring-1 ring-emerald-500/20 bg-emerald-500/5" : ""}`}
+            className={`h-full min-h-[96px] p-3 sm:p-4 flex overflow-hidden ${isFirst ? "ring-1 ring-emerald-500/20 bg-emerald-500/5" : ""}`}
           >
-            <div className="flex items-stretch gap-2 sm:gap-3 min-w-0 w-full flex-1">
+            <div className="flex items-stretch gap-2 sm:gap-3 min-w-0 w-full flex-1 overflow-hidden">
               <div className={`w-8 h-8 sm:w-9 sm:h-9 ${stat.iconBg} rounded-lg flex items-center justify-center shrink-0`}>
                 {stat.icon}
               </div>
-              <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5 py-0.5">
+              <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5 py-0.5 overflow-hidden">
                 <p className="text-[11px] sm:text-xs text-[var(--muted-2)] leading-tight shrink-0">{stat.label}</p>
                 {showZeroState ? (
                   <>
@@ -314,15 +320,14 @@ export default function DashboardPage() {
                   </>
                 ) : (
                   <>
-                    <p className="text-2xl sm:text-3xl font-bold font-heading tabular-nums leading-tight min-h-[1.75em] flex items-center flex-1">
+                    <p className="text-2xl sm:text-3xl font-bold font-heading tabular-nums leading-tight">
                       {typeof stat.value === "number" ? stat.value : stat.value}
-                      {isFirst && stat.sub === "scholarships" ? ` ${stat.sub}` : ""}
                     </p>
-                    {isMoney && "subWhenZero" in stat && stat.subWhenZero && (
-                      <p className="text-[11px] text-emerald-400/90 leading-tight">{stat.subWhenZero}</p>
-                    )}
+                    {isFirst && stat.sub === "scholarships" ? (
+                      <p className="text-[11px] sm:text-xs text-[var(--muted-2)] leading-tight">{stat.sub}</p>
+                    ) : null}
                     {stat.sub != null && stat.sub !== "scholarships" && (
-                      <p className="text-[11px] text-[var(--muted-2)] leading-tight">{stat.sub}</p>
+                      <p className={`text-[11px] leading-tight ${isMoney ? "font-medium text-emerald-400 dark:text-emerald-300" : "text-[var(--muted-2)]"}`}>{stat.sub}</p>
                     )}
                   </>
                 )}
@@ -332,6 +337,19 @@ export default function DashboardPage() {
           );
         })}
       </div>
+
+      {weeklyPlanning.count >= 2 && weeklyPlanning.potentialSum > 0 && (
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-400">
+            If you apply to these {weeklyPlanning.count} recommended scholarship{weeklyPlanning.count === 1 ? "" : "s"} this week:
+          </p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">
+            Estimated <strong className="text-[var(--text)]">{weeklyPlanning.hours} hours</strong>
+            {" · "}
+            Potential ROI: <strong className="text-emerald-500 dark:text-emerald-400">${weeklyPlanning.potentialSum.toLocaleString()}</strong>
+          </p>
+        </div>
+      )}
 
       {topRecommended.length > 0 && (
         <div className="space-y-3">
@@ -343,7 +361,7 @@ export default function DashboardPage() {
               <Card key={scholarship.id} className="p-4 flex flex-col">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-medium text-[var(--text)] text-sm line-clamp-2">
-                    {decodeHtmlEntities(scholarship.title)}
+                    {displayScholarshipTitle(scholarship.title)}
                   </h3>
                   <span className="shrink-0 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold px-2 py-0.5">
                     {matchScore}%
