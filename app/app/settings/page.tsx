@@ -20,7 +20,7 @@ import { getIdToken } from "@/hooks/useAdmin";
 export default function SettingsPage() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [deadlineReminders, setDeadlineReminders] = useState(true);
-  const [theme, setThemeState] = useState<Theme>("light");
+  const [theme, setThemeState] = useState<Theme>("dark");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);

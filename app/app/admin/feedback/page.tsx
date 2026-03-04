@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAdmin, getIdToken } from "@/hooks/useAdmin";
 
@@ -20,28 +22,55 @@ export default function AdminFeedbackPage() {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const [items, setItems] = useState<FeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+
+  const load = async () => {
+    const token = await getIdToken();
+    if (!token) return;
+    try {
+      const res = await fetch("/api/admin/feedback", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data.items ?? []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!isAdmin) return;
-    const load = async () => {
-      const token = await getIdToken();
-      if (!token) return;
-      try {
-        const res = await fetch("/api/admin/feedback", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setItems(data.items ?? []);
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
     load();
   }, [isAdmin]);
+
+  const handleClearList = async () => {
+    const token = await getIdToken();
+    if (!token) return;
+    setClearing(true);
+    try {
+      const res = await fetch("/api/admin/feedback", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setConfirmClearOpen(false);
+        setItems([]);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Failed to clear feedback");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to clear feedback");
+    } finally {
+      setClearing(false);
+    }
+  };
 
   const formatTime = (t?: { _seconds?: number; seconds?: number }) => {
     const sec = t?._seconds ?? t?.seconds;
@@ -62,6 +91,18 @@ export default function AdminFeedbackPage() {
       <PageHeader
         title="Feedback"
         subtitle="User-submitted feedback and reports."
+        primaryAction={
+          items.length > 0 ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setConfirmClearOpen(true)}
+              disabled={clearing}
+            >
+              {clearing ? "Clearing…" : "Clear feedback list"}
+            </Button>
+          ) : null
+        }
       />
 
       <Card className="p-4">
@@ -86,6 +127,20 @@ export default function AdminFeedbackPage() {
           </div>
         )}
       </Card>
+
+      <Modal
+        open={confirmClearOpen}
+        title="Clear feedback list?"
+        description="This will permanently delete all feedback items. Use this after you've finished reviewing. This cannot be undone."
+        primaryLabel="Clear all"
+        destructive
+        closeOnPrimaryClick={false}
+        primaryDisabled={clearing}
+        onClose={() => setConfirmClearOpen(false)}
+        onPrimary={handleClearList}
+        secondaryLabel="Cancel"
+        onSecondary={() => setConfirmClearOpen(false)}
+      />
     </div>
   );
 }

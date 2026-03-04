@@ -471,7 +471,7 @@ export default function LandingPage() {
                       { name: "Future Leaders Program", amount: "$10,000", status: "In Review", statusClass: "status-review", iconBg: "bg-blue-500/20", iconColor: "text-blue-400", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
                       { name: "STEM Innovation Grant", amount: "$7,500", status: "Pending", statusClass: "status-pending", iconBg: "bg-yellow-500/20", iconColor: "text-yellow-400", icon: "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }
                     ].map((item) => (
-                      <div key={item.name} className="flex items-center justify-between p-2.5 bg-gray-900/50 rounded-lg">
+                      <div key={item.name} className="flex items-center justify-between p-2.5 bg-[var(--surface-2)] rounded-lg border border-[var(--border)]">
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 ${item.iconBg} rounded-lg flex items-center justify-center`}>
                             <svg className={`w-5 h-5 ${item.iconColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">

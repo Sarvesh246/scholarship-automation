@@ -45,7 +45,9 @@ export async function GET(
 
   const cached = getCachedDetail(id);
   if (cached) {
-    return NextResponse.json(cached);
+    const headers = new Headers();
+    headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+    return NextResponse.json(cached, { headers });
   }
 
   try {
@@ -70,7 +72,9 @@ export async function GET(
     }
 
     setCachedDetail(id, s);
-    return NextResponse.json(s);
+    const headers = new Headers();
+    headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+    return NextResponse.json(s, { headers });
   } catch (err) {
     console.error("[GET /api/scholarships/[id]]", err);
     return NextResponse.json({ error: "Failed to fetch scholarship" }, { status: 500 });

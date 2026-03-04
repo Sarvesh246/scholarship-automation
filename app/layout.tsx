@@ -55,8 +55,7 @@ export const metadata: Metadata = {
 const themeScript = `
 (function() {
   var stored = localStorage.getItem('theme');
-  var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  var theme = stored === 'light' || stored === 'dark' ? stored : (prefersDark ? 'dark' : 'light');
+  var theme = stored === 'light' || stored === 'dark' ? stored : 'dark';
   if (document.body) {
     if (theme === 'dark') document.body.classList.add('dark');
     else document.body.classList.remove('dark');

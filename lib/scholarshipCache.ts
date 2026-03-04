@@ -1,10 +1,10 @@
 /**
  * In-memory TTL cache for scholarship list and detail responses.
  * Reduces Firestore reads on repeated page loads and navigations.
- * Works in serverless (per-instance); use short TTL for consistency.
+ * Works in serverless (per-instance); longer TTL reduces quota usage.
  */
 
-const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_TTL_MS = 15 * 60 * 1000; // 15 minutes – balance freshness vs Firestore reads
 
 interface CacheEntry<T> {
   data: T;

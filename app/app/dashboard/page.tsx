@@ -126,7 +126,7 @@ export default function DashboardPage() {
   const estimatedSum = useMemo(
     () =>
       applications
-        .filter((a) => a.status !== "not_started" && a.status !== "submitted")
+        .filter((a) => a.status === "submitted")
         .reduce((sum, a) => {
           const s = scholarships.find((sch) => sch.id === a.scholarshipId);
           return sum + (s?.amount ?? 0);

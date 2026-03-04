@@ -18,10 +18,7 @@ In your Vercel project: **Settings → Environment Variables**. You can add vari
 
 Vercel lets you **Import** a `.env` file (e.g. paste contents or upload):
 
-1. **Prepare a file** with one variable per line in the form `KEY=value`. Use [.env.local.example](../.env.local.example) in this repo as a template — copy it and fill in your values. Or copy from your project’s local env file: [.env.local](../.env.local) (project root; not in the repo so the link only works when you have the project open locally).
-2. Copy from your local `.env.local` if you have one — but see the note about `FIREBASE_SERVICE_ACCOUNT_KEY` below.
-3. In Vercel → **Environment Variables** → **Import** (or paste into the import box), then choose which environments (Production, Preview, Development) to apply to.
-4. **Do not commit** that file to git if it contains real secrets. Use it only for the one-time import, then delete it or keep it local.
+
 
 **Important for `FIREBASE_SERVICE_ACCOUNT_KEY`:** The service account is a multi-line JSON. For import, it must be **one line**. Put the whole JSON on a single line (minified), and in the env file use quotes so the value is one line:
 

@@ -4,7 +4,7 @@ const THEME_KEY = "theme";
 
 export function getInitialTheme(): Theme {
   if (typeof window === "undefined") {
-    return "light";
+    return "dark";
   }
 
   const stored = window.localStorage.getItem(THEME_KEY) as Theme | null;
@@ -12,10 +12,7 @@ export function getInitialTheme(): Theme {
     return stored;
   }
 
-  const prefersDark = window.matchMedia?.(
-    "(prefers-color-scheme: dark)"
-  ).matches;
-  return prefersDark ? "dark" : "light";
+  return "dark";
 }
 
 export function setTheme(theme: Theme) {

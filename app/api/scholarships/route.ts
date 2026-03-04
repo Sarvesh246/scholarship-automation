@@ -51,7 +51,9 @@ export async function GET(request: NextRequest) {
   const cacheKey = listCacheKey({ limit, cursor: cursor || null, q });
   const cached = getCachedList(cacheKey);
   if (cached) {
-    return NextResponse.json({ items: cached.items, nextCursor: cached.nextCursor });
+    const headers = new Headers();
+    headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+    return NextResponse.json({ items: cached.items, nextCursor: cached.nextCursor }, { headers });
   }
 
   try {
@@ -100,7 +102,9 @@ export async function GET(request: NextRequest) {
 
     const result = { items, nextCursor };
     setCachedList(cacheKey, result);
-    return NextResponse.json(result);
+    const headers = new Headers();
+    headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+    return NextResponse.json(result, { headers });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[GET /api/scholarships]", err);

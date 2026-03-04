@@ -531,7 +531,7 @@ export default function ScholarshipDetailClient() {
               type="button"
               size="sm"
               onClick={handleFeedback}
-              disabled={feedbackSubmitting || feedbackMessage.trim().length < 10}
+              disabled={feedbackSubmitting}
             >
               {feedbackSubmitting ? "Sending…" : "Submit feedback"}
             </Button>

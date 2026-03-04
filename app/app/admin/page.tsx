@@ -96,22 +96,12 @@ const adminSections = [
     ),
   },
   {
-    href: "/app/admin/sync",
-    title: "Sync scholarships",
-    description: "Run ScholarshipOwl, Grants.gov, or custom URL sync. Pull from APIs into Firestore.",
+    href: "/app/admin/scrape",
+    title: "Sync & scrape",
+    description: "Run sync (Owl, Grants.gov, custom URL), scrape aggregators and foundations, run full validation.",
     icon: (
       <svg className="h-8 w-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-      </svg>
-    ),
-  },
-  {
-    href: "/app/admin/scrape",
-    title: "Scrape scholarships",
-    description: "Scrape CollegeScholarships.org, Bold.org, Scholarships360, CollegeData, and more.",
-    icon: (
-      <svg className="h-8 w-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
       </svg>
     ),
   },

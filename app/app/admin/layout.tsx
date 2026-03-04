@@ -15,8 +15,7 @@ const adminNavItems: { href: string; label: string }[] = [
   { href: "/app/admin/users", label: "Users" },
   { href: "/app/admin/feedback", label: "Feedback" },
   { href: "/app/admin/moderation", label: "Moderation queue" },
-  { href: "/app/admin/sync", label: "Sync" },
-  { href: "/app/admin/scrape", label: "Scrape" },
+  { href: "/app/admin/scrape", label: "Sync & scrape" },
 ];
 
 export default function AdminLayout({

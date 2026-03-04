@@ -94,7 +94,7 @@ export default function FeedbackPage() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Button type="submit" disabled={submitting || message.trim().length < 10}>
+            <Button type="submit" disabled={submitting}>
               {submitting ? "Sending…" : "Submit feedback"}
             </Button>
             <Link href="/app/dashboard" className="text-sm text-[var(--muted-2)] hover:text-[var(--text)]">

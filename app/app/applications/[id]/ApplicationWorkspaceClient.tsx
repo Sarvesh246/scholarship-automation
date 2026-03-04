@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getApplication, saveApplication, deleteApplication, updateApplicationStatus, updateApplicationPromptResponses, updateApplicationDocs, updateApplicationLastViewed, updateApplicationOutcome } from "@/lib/applicationStorage";
 import { getScholarship } from "@/lib/scholarshipStorage";
@@ -37,6 +37,9 @@ export default function ApplicationWorkspaceClient() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [essays, setEssays] = useState<Essay[]>([]);
+  const [localPromptResponses, setLocalPromptResponses] = useState<string[]>([]);
+  const promptSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const promptSavePendingRef = useRef<string[] | null>(null);
 
   const loadData = useCallback(async () => {
     const [app, userEssays] = await Promise.all([
@@ -56,6 +59,36 @@ export default function ApplicationWorkspaceClient() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const prompts = scholarship?.prompts ?? [];
+  useEffect(() => {
+    if (!application || prompts.length === 0) return;
+    const fromApp = prompts.map((_, i) => (application.promptResponses ?? [])[i]?.response ?? "");
+    setLocalPromptResponses(fromApp);
+  }, [application?.id, application?.promptResponses, prompts.length]);
+
+  const flushPromptSaves = useCallback(async () => {
+    if (!id || !application || promptSavePendingRef.current === null) return;
+    const next = promptSavePendingRef.current;
+    promptSavePendingRef.current = null;
+    const payload = prompts.map((prompt, i) => ({ prompt, response: next[i] ?? "" }));
+    await updateApplicationPromptResponses(id, payload, {
+      docsRequired: (application.docsRequired ?? []).length,
+      docsUploaded: (application.docsUploaded ?? []).length,
+      promptsTotal: prompts.length,
+    });
+    const updated = await getApplication(id);
+    if (updated) setApplication(updated);
+  }, [id, application, prompts]);
+
+  useEffect(() => {
+    return () => {
+      if (promptSaveTimeoutRef.current) {
+        clearTimeout(promptSaveTimeoutRef.current);
+        promptSaveTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const handleSave = async () => {
     if (!application) return;
@@ -117,7 +150,6 @@ export default function ApplicationWorkspaceClient() {
     );
   }
 
-  const prompts = scholarship.prompts ?? [];
   const steps: { key: StepKey; label: string }[] = [
     { key: "overview", label: "Overview" },
     { key: "eligibility", label: "Eligibility" },
@@ -270,19 +302,19 @@ export default function ApplicationWorkspaceClient() {
                 <PromptBlock
                   key={index}
                   prompt={prompt}
-                  value={(application.promptResponses ?? [])[index]?.response ?? ""}
+                  value={localPromptResponses[index] ?? ""}
                   suggestedEssays={matchEssaysToPrompt(essays, prompt, scholarship)}
-                  onChange={async (value) => {
-                    const next = [...(application.promptResponses ?? [])];
-                    while (next.length <= index) next.push({ prompt: prompts[next.length] ?? "", response: "" });
-                    next[index] = { prompt, response: value };
-                    await updateApplicationPromptResponses(id, next, {
-                      docsRequired: (application.docsRequired ?? []).length,
-                      docsUploaded: (application.docsUploaded ?? []).length,
-                      promptsTotal: prompts.length,
-                    });
-                    const updated = await getApplication(id);
-                    if (updated) setApplication(updated);
+                  onChange={(value) => {
+                    const next = [...localPromptResponses];
+                    while (next.length <= index) next.push("");
+                    next[index] = value;
+                    setLocalPromptResponses(next);
+                    promptSavePendingRef.current = next;
+                    if (promptSaveTimeoutRef.current) clearTimeout(promptSaveTimeoutRef.current);
+                    promptSaveTimeoutRef.current = setTimeout(() => {
+                      promptSaveTimeoutRef.current = null;
+                      flushPromptSaves();
+                    }, 500);
                   }}
                 />
               ))}
