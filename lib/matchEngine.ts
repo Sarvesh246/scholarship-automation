@@ -83,7 +83,7 @@ function majorMatchScore(
 export function buildUserSignals(profile: Profile): UserSignals {
   const loc = profile.location ?? {};
   const ac = profile.academics ?? {};
-  const prof = profile as Record<string, unknown>;
+  const prof = profile as unknown as Record<string, unknown>;
   const state = (loc as Record<string, unknown>).state ?? (loc as Record<string, unknown>).state_code ?? (loc as Record<string, unknown>).stateCode ?? profile.demographics?.state;
   const educationLevel = profile.educationLevel ?? (prof.education_level as string);
   const gpaRaw = ac.gpa?.trim() ? parseFloat(ac.gpa) : null;
@@ -625,12 +625,12 @@ export function profileHasAnyMatchData(profile: Profile): boolean {
   const loc = profile.location ?? {};
   const ac = profile.academics ?? {};
   const state = (loc as Record<string, unknown>).state ?? (loc as Record<string, unknown>).state_code ?? profile.demographics?.state;
-  const educationLevel = profile.educationLevel ?? (profile as Record<string, unknown>).education_level;
+  const educationLevel = profile.educationLevel ?? (profile as unknown as Record<string, unknown>).education_level;
   const hasMajor =
     (profile.intendedMajors?.length ?? 0) > 0 ||
-    (profile as Record<string, unknown>).intended_majors != null ||
+    (profile as unknown as Record<string, unknown>).intended_majors != null ||
     (ac.major ?? "").trim() !== "" ||
     (profile.majorsFreeText ?? "").trim() !== "" ||
-    ((profile as Record<string, unknown>).majors_free_text as string)?.trim() !== "";
+    ((profile as unknown as Record<string, unknown>).majors_free_text as string)?.trim() !== "";
   return !!(state && String(state).trim()) || !!(educationLevel && String(educationLevel).trim()) || hasMajor;
 }
