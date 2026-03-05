@@ -7,6 +7,7 @@ export interface ScrapedScholarship {
   amount?: number;
   deadline?: string;
   description?: string;
+  applicationUrl?: string;
   /** Inventory tag for filtering (e.g. institutional_departmental, professional_association). */
   sourceType?: string;
 }

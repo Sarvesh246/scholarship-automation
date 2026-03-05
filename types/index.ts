@@ -249,16 +249,51 @@ export interface UserSignals {
 }
 
 /** Result of matching one scholarship to the user. */
+export interface MatchBreakdown {
+  /** Layer A: per-gate result for debug UI. */
+  gates: {
+    deadline: "pass" | "fail" | "unknown";
+    location: "pass" | "fail" | "unknown";
+    educationLevel: "pass" | "fail" | "unknown";
+    gpa: "pass" | "fail" | "unknown";
+    major: "pass" | "fail" | "unknown";
+  };
+  /** Layer B: weighted score components (0–100 total before multiplier). */
+  scoreBreakdown: {
+    location: number;
+    educationLevel: number;
+    gpa: number;
+    major: number;
+    needBased: number;
+    essay: number;
+    effort: number;
+    activities: number;
+    total: number;
+  };
+  /** Layer C: completion readiness penalty (0 = none). */
+  readinessPenalty: number;
+  /** eligibilityStatus used for multiplier. */
+  eligibilityMultiplier: number;
+}
+
 export interface ScholarshipMatchResult {
   scholarshipId: string;
+  /** Layer A: eligible = all gates pass; ineligible = at least one fail; unknown = can't evaluate (missing data). */
   eligibilityStatus: "eligible" | "may_not_be_eligible" | "almost_eligible" | "ineligible" | "unknown";
+  /** 0–100; same as matchPercent. Kept for backward compatibility. */
   matchScore: number;
+  /** 0–100; final match percentage after eligibility multiplier. */
+  matchPercent: number;
   reasons: string[];
   missingRequirements: string[];
+  /** Profile fields to add to improve match (e.g. "State", "Education level", "Activities"). */
+  missingProfileFields: string[];
   /** Criteria that failed (for Layer 1 / tooltips). */
   failedCriteria?: string[];
   /** Human-readable reason for "Almost Eligible" e.g. "Requires 3.5 GPA (you have 3.4)". */
   almostEligibleReason?: string;
+  /** Dev/debug: per-gate and score breakdown. Present when computed with includeBreakdown. */
+  matchBreakdown?: MatchBreakdown;
 }
 
 /** User-submitted scholarship for moderation queue. */

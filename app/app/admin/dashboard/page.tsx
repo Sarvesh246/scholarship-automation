@@ -157,7 +157,7 @@ export default function AdminDashboardPage() {
               <p className="text-lg font-bold">{stats.matchingHealth.averageQualityScore ?? "—"}</p>
             </div>
           </div>
-          <Link href="/app/admin/sync#validation" className="inline-block mt-3">
+          <Link href="/app/admin/scrape#validation" className="inline-block mt-3">
             <Button type="button" variant="secondary" size="sm">Run full validation</Button>
           </Link>
         </Card>
@@ -241,10 +241,10 @@ export default function AdminDashboardPage() {
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Link href="/app/admin/sync">
+        <Link href="/app/admin/scrape">
           <Button type="button" variant="primary">Run sync</Button>
         </Link>
-        <Link href="/app/admin/sync#validation">
+        <Link href="/app/admin/scrape#validation">
           <Button type="button" variant="secondary">Run full validation</Button>
         </Link>
         <Link href="/app/admin/scrape">

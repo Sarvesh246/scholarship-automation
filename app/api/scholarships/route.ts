@@ -26,7 +26,8 @@ function isJunk(s: Scholarship): boolean {
 
 function passesQuality(s: Scholarship): boolean {
   if (s.verificationStatus === "approved") return true;
-  if (s.verificationStatus === "hidden" || s.verificationStatus === "flagged" || s.verificationStatus === "needs_review") return false;
+  if (s.verificationStatus === "needs_review") return true;
+  if (s.verificationStatus === "hidden" || s.verificationStatus === "flagged") return false;
   if (s.verificationStatus === undefined && s.qualityScore === undefined) return true;
   return (s.qualityScore ?? 0) >= MIN_SCORE_APPROVED;
 }

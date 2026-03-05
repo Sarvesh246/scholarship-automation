@@ -4,9 +4,22 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { getIdToken } from "@/hooks/useAdmin";
+import { SCRAPERS } from "@/lib/scrapers";
+import type { ScraperId } from "@/lib/scrapers";
 
 const STORAGE_KEY = "adminScrapeJobId";
 const POLL_INTERVAL_MS = 5000;
+
+function buildScrapeMessage(result: { results?: Record<string, { created?: number; updated?: number }> } | undefined): string {
+  if (!result?.results) return "Scrape completed.";
+  const parts = Object.entries(result.results)
+    .filter(([, r]) => ((r?.created ?? 0) + (r?.updated ?? 0)) > 0)
+    .map(([id, r]) => {
+      const name = SCRAPERS[id as ScraperId]?.name ?? id;
+      return `${name}: ${r?.created ?? 0} created, ${r?.updated ?? 0} updated`;
+    });
+  return parts.length ? parts.join(". ") : "Scrape completed.";
+}
 
 export function ScrapeJobPoller() {
   const { showToast } = useToast();
@@ -35,22 +48,19 @@ export function ScrapeJobPoller() {
             }
             sessionStorage.removeItem(STORAGE_KEY);
 
-            const result = data.result as { ok?: boolean; error?: string; results?: Record<string, { updated: number }> } | undefined;
+            const result = data.result as { ok?: boolean; error?: string; results?: Record<string, { created?: number; updated?: number }> } | undefined;
             const message = data.status === "failed"
               ? (result?.error ?? "Scrape failed.")
-              : result?.results
-                ? Object.entries(result.results)
-                    .filter(([, r]) => (r?.updated ?? 0) > 0)
-                    .map(([id, r]) => `${id}: ${r?.updated ?? 0} updated`)
-                    .join(". ") || "Scrape completed."
-                : "Scrape completed.";
+              : buildScrapeMessage(result);
+
+            const openScrapePage = () => router.push(`/app/admin/scrape?job=${encodeURIComponent(jobId)}`);
 
             showToast({
               title: data.status === "completed" ? "Scraping completed" : "Scraping failed",
               message,
               variant: data.status === "completed" ? "success" : "danger",
-              actionLabel: "View audit",
-              onAction: () => router.push(`/app/admin/scrape?job=${encodeURIComponent(jobId)}`),
+              actionLabel: "Open Sync & scrape",
+              onAction: openScrapePage,
             });
           }
         })

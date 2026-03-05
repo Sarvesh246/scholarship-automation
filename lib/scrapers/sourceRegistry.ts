@@ -35,6 +35,8 @@ export const SCRAPER_SOURCE_TYPES: Record<string, SourceType> = {
   municipal: "municipal",
   community_foundations: "community_foundation",
   corporate_foundations: "corporate_foundation",
+  state_financial_aid: "civic",
+  wikipedia_scholarships: "aggregator",
 };
 
 export const ALL_SOURCE_TYPES = Object.keys(SOURCE_TYPE_LABELS) as SourceType[];

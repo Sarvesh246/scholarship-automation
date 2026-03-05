@@ -19,6 +19,8 @@ interface Props {
   greenlightHighlight?: boolean;
   /** When true, show "High ROI" opportunity badge. */
   showHighROI?: boolean;
+  /** When true and matchResult has matchBreakdown, show debug breakdown (e.g. ?debug=1). */
+  showMatchBreakdown?: boolean;
 }
 
 export const ScholarshipRowCard = memo(function ScholarshipRowCard({
@@ -28,6 +30,7 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
   matchResult,
   greenlightHighlight = false,
   showHighROI = false,
+  showMatchBreakdown = false,
 }: Props) {
   const [starting, setStarting] = useState(false);
   const router = useRouter();
@@ -157,14 +160,45 @@ export const ScholarshipRowCard = memo(function ScholarshipRowCard({
         </div>
       </div>
       <div className="flex flex-col items-end gap-2 shrink-0">
-        {matchResult && matchResult.matchScore > 0 && (
+        {matchResult != null && (() => {
+          const rawPct = matchResult.matchPercent ?? matchResult.matchScore;
+          const pct = Number(rawPct);
+          const numPct = Number.isFinite(pct) ? Math.round(pct) : 0;
+          const displayPct = (matchResult.reasons?.length > 0 && numPct === 0) ? 50 : numPct;
+          return (
           <span
-            className="rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold px-2.5 py-1"
-            title="Match score from your profile"
+            className={`rounded-full text-xs font-semibold px-2.5 py-1 ${
+              displayPct >= 50
+                ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                : displayPct >= 25
+                  ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                  : "bg-[var(--muted)]/20 text-[var(--muted-2)]"
+            }`}
+            title={matchResult.reasons?.length ? `Based on your profile: ${matchResult.reasons.slice(0, 3).join(", ")}` : "Match based on your profile"}
+            data-match-debug={showMatchBreakdown ? JSON.stringify({ matchPercent: matchResult.matchPercent, matchScore: matchResult.matchScore, rawPct, displayPct }) : undefined}
           >
-            {matchResult.matchScore}% match
+            {displayPct}% match
           </span>
-        )}
+          );
+        })()}
+        {matchResult?.missingProfileFields?.length ? (
+          <span className="text-[10px] text-[var(--muted-2)]" title={`Add: ${matchResult.missingProfileFields.join(", ")}`}>
+            Add {matchResult.missingProfileFields.slice(0, 2).join(", ")} for more matches
+          </span>
+        ) : null}
+        {showMatchBreakdown && matchResult?.matchBreakdown ? (
+          <details className="text-left w-full max-w-md mt-1">
+            <summary className="text-[10px] text-[var(--muted-2)] cursor-pointer hover:text-[var(--muted)]">
+              Match breakdown (debug)
+            </summary>
+            <div className="mt-1 text-[10px] text-[var(--muted-2)] space-y-0.5 pl-2 border-l border-[var(--border)]">
+              <div>Gates: {["deadline", "location", "educationLevel", "gpa", "major"].map((k) => `${k}=${matchResult!.matchBreakdown!.gates[k as keyof typeof matchResult.matchBreakdown.gates]}`).join(", ")}</div>
+              <div>Score: loc {matchResult.matchBreakdown.scoreBreakdown.location}+edu {matchResult.matchBreakdown.scoreBreakdown.educationLevel}+gpa {matchResult.matchBreakdown.scoreBreakdown.gpa}+maj {matchResult.matchBreakdown.scoreBreakdown.major}+need {matchResult.matchBreakdown.scoreBreakdown.needBased}+essay {matchResult.matchBreakdown.scoreBreakdown.essay}+effort {matchResult.matchBreakdown.scoreBreakdown.effort}+act {matchResult.matchBreakdown.scoreBreakdown.activities} = {matchResult.matchBreakdown.scoreBreakdown.total}</div>
+              {matchResult.matchBreakdown.readinessPenalty > 0 && <div>Readiness penalty: -{matchResult.matchBreakdown.readinessPenalty}</div>}
+              <div>Multiplier: {matchResult.matchBreakdown.eligibilityMultiplier}</div>
+            </div>
+          </details>
+        ) : null}
         <Button
           type="button"
           size="sm"

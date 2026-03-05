@@ -107,7 +107,7 @@ In **Project Settings → Environment Variables**, add (for Production; same val
 - **To be admin when you sign in on the deployed site:**  
   `ADMIN_EMAILS` — set to your Google sign-in email (e.g. `you@gmail.com`). Only emails in this list see the Admin section; add multiple with commas.
 
-Optional (cron sync, etc.): `CRON_SECRET`, `SCHOLARSHIP_API_URL`, `SCHOLARSHIP_OWL_API_KEY`. See Admin and cron sections below.
+Optional (cron sync, etc.): `CRON_SECRET`, `SCHOLARSHIP_API_URL`, `SCHOLARSHIP_OWL_API_KEY`, `SCHOLARSHIP_RSS_FEEDS`, `NIH_REPORTER_ENABLED`. See Admin and cron sections below.
 
 **Step-by-step:** See **[docs/vercel-firebase-setup.md](docs/vercel-firebase-setup.md)** for getting the service account key and configuring admin.
 
@@ -152,6 +152,10 @@ Only users whose **email** is in `ADMIN_EMAILS` see the **Admin** link in the si
 ### 3. Adding scholarships
 
 Use **Admin → Scholarships** in the app: click **Add scholarship**, fill title, sponsor, amount, deadline, description, categories, eligibility, and essay prompts. New scholarships show up for all users after you save. No deploy or seed script needed.
+
+### 4. Why total count vs. public page count differs
+
+Admin may show a higher total (e.g. 533) than the public scholarship page (e.g. 164) because the public list only shows items with a **future deadline**, **approved** or **needs_review** status, **main-feed** funding type, and other filters. See **[docs/SCHOLARSHIP_SOURCES.md](docs/SCHOLARSHIP_SOURCES.md)** for the full funnel and how to grow the catalog (sync, scrape, import from URLs, Grants.gov keywords).
 
 ---
 
@@ -201,7 +205,7 @@ The repo includes a `vercel.json` that schedules the sync every hour:
 }
 ```
 
-On Vercel, set `CRON_SECRET` and `SCHOLARSHIP_API_URL` (and `SCHOLARSHIP_API_KEY` if needed) in the project environment. Vercel will call the route on the schedule and send `Authorization: Bearer <CRON_SECRET>`.
+On Vercel, set `CRON_SECRET` (required for cron) and any of `SCHOLARSHIP_API_URL`, `SCHOLARSHIP_RSS_FEEDS`, `NIH_REPORTER_ENABLED` you want. Vercel will call the route on the schedule and send `Authorization: Bearer <CRON_SECRET>`.
 
 ### 5. Other cron providers
 

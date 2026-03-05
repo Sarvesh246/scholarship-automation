@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -38,6 +38,7 @@ export default function DashboardPage() {
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
   const [matchResults, setMatchResults] = useState<{ id: string; matchScore: number; eligibilityStatus: string; reasons: string[] }[]>([]);
   const [loading, setLoading] = useState(true);
+  const matchExpectedLengthRef = useRef(0);
 
   // Phase 1: Load applications first so the dashboard can paint quickly (especially on mobile).
   // Phase 2: Load scholarships in background so pipeline/stat details fill in; match runs deferred.
@@ -59,29 +60,28 @@ export default function DashboardPage() {
     return () => window.removeEventListener("focus", onFocus);
   }, [loadData]);
 
-  // Defer match computation so it doesn't block the main thread (helps mobile stay responsive).
+  // Run match immediately (no requestIdleCallback) so results are applied before effect re-runs.
   useEffect(() => {
-    if (!user?.uid || scholarships.length === 0) return;
+    if (scholarships.length === 0) return;
+    matchExpectedLengthRef.current = scholarships.length;
+    const userId = user?.uid ?? "anonymous";
     let cancelled = false;
     const run = async () => {
       const profile = await getProfile();
       if (cancelled) return;
-      const cached = getCachedMatches(user.uid);
+      const cached = getCachedMatches(userId);
       if (cached && cached.length === scholarships.length) {
         setMatchResults(cached.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus, reasons: r.reasons ?? [] })));
         return;
       }
-      const runMatch = () => {
-        if (cancelled) return;
-        computeMatchesForUser(user.uid, profile, scholarships).then((results) => {
-          if (!cancelled) setMatchResults(results.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus, reasons: r.reasons ?? [] })));
-        });
-      };
-      if (typeof requestIdleCallback !== "undefined") {
-        requestIdleCallback(runMatch, { timeout: 600 });
-      } else {
-        setTimeout(runMatch, 0);
-      }
+      const expectedLen = matchExpectedLengthRef.current;
+      computeMatchesForUser(userId, profile, scholarships)
+        .then((results) => {
+          if (cancelled) return;
+          if (results.length !== expectedLen) return;
+          setMatchResults(results.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus, reasons: r.reasons ?? [] })));
+        })
+        .catch(() => {});
     };
     run();
     return () => { cancelled = true; };
@@ -135,7 +135,7 @@ export default function DashboardPage() {
   );
 
   const applicationIds = useMemo(() => new Set(applications.map((a) => a.scholarshipId)), [applications]);
-  // Same formula as scholarships page Greenlight: eligible or almost_eligible, score >= 70, exclude sweepstakes, exclude already applied
+  // Same formula as scholarships page Greenlight: eligible or almost_eligible, score >= GREENLIGHT_MIN_SCORE, exclude sweepstakes, exclude already applied
   const greenlightEligibleCount = useMemo(() => {
     return matchResults.filter((r) => {
       if (applicationIds.has(r.id)) return false;
@@ -153,7 +153,7 @@ export default function DashboardPage() {
       .map((s) => {
         const r = matchResults.find((m) => m.id === s.id);
         if (!r) return null;
-        const ok = r.eligibilityStatus === "eligible" || r.eligibilityStatus === "almost_eligible" || (r.eligibilityStatus === "may_not_be_eligible" && r.matchScore >= 50);
+        const ok = r.eligibilityStatus === "eligible" || r.eligibilityStatus === "almost_eligible" || (r.eligibilityStatus === "may_not_be_eligible" && r.matchScore >= 35);
         if (!ok) return null;
         return { scholarship: s, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus, reasons: r.reasons ?? [] };
       })
@@ -351,11 +351,11 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {topRecommended.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-medium text-[var(--muted)]">
-            Top recommended for you
-          </h2>
+      <div className="space-y-3">
+        <h2 className="text-sm font-medium text-[var(--muted)]">
+          Top recommended for you
+        </h2>
+        {topRecommended.length > 0 ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {topRecommended.map(({ scholarship, matchScore, reasons }) => (
               <Card key={scholarship.id} className="p-4 flex flex-col">
@@ -391,8 +391,23 @@ export default function DashboardPage() {
               </Card>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-6 text-center">
+            <p className="text-sm font-medium text-[var(--text)]">No current matches</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              Improve your profile or check back when we add more scholarships.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+              <Link href="/app/profile" className="inline-flex text-sm font-medium text-amber-500 hover:text-amber-400">
+                Improve profile
+              </Link>
+              <Link href="/app/scholarships" className="inline-flex text-sm font-medium text-[var(--muted)] hover:text-[var(--text)]">
+                Browse all scholarships
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-[var(--muted)]">

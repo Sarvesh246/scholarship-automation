@@ -13,7 +13,7 @@ import {
   type ScholarshipOwlListItem,
   type ScholarshipOwlDetailResponse,
 } from "./scholarshipOwlApi";
-import { listEducationGrants, fetchOpportunityDetails, type GrantsGovOppHit } from "./grantsGovApi";
+import { listEducationGrants, listGrantsByKeyword, fetchOpportunityDetails, type GrantsGovOppHit } from "./grantsGovApi";
 
 /** Shape we can map from common external APIs (ScholarshipAPI.com, Apify, etc.). */
 export interface ExternalScholarshipItem {
@@ -307,7 +307,129 @@ export async function syncScholarshipsFromUrl(
   return { created, updated, errors };
 }
 
-/** Parse MM/DD/YYYY to YYYY-MM-DD. */
+/** Fetch JSON from URL and return array of items (array or { items/data/scholarships/results }). */
+async function fetchJsonArray(url: string): Promise<ExternalScholarshipItem[]> {
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
+  const data = await res.json();
+  if (Array.isArray(data)) return data;
+  if (data?.items && Array.isArray(data.items)) return data.items;
+  if (data?.data && Array.isArray(data.data)) return data.data;
+  if (data?.scholarships && Array.isArray(data.scholarships)) return data.scholarships;
+  if (data?.results && Array.isArray(data.results)) return data.results;
+  return [];
+}
+
+/** Shared: filter by deadline, map to scholarship, run quality, batch write to Firestore. */
+async function writeExternalItemsToFirestore(
+  items: ExternalScholarshipItem[],
+  sourceLabel: string
+): Promise<{ created: number; updated: number; errors: string[] }> {
+  const toSync = items
+    .filter((item) => isDeadlineValid(item.deadline))
+    .map((item) => {
+      const s = enrichWithClassification(mapExternalToScholarship(item));
+      s.source = sourceLabel;
+      return s;
+    })
+    .map((s) => {
+      const q = runQualityVerification(s);
+      const normalized = normalizeScholarship({ ...s, ...q });
+      return {
+        ...s,
+        qualityScore: q.qualityScore,
+        verificationStatus: q.verificationStatus,
+        domainTrustScore: q.domainTrustScore,
+        displayCategory: q.displayCategory,
+        lastVerifiedAt: q.lastVerifiedAt,
+        riskFlags: q.riskFlags,
+        qualityTier: q.qualityTier,
+        fundingType: q.fundingType,
+        scholarshipScore: q.scholarshipScore,
+        normalized,
+      };
+    });
+
+  const db = getAdminFirestore();
+  const col = db.collection("scholarships");
+  let created = 0;
+  let updated = 0;
+  const errors: string[] = [];
+  const BATCH_SIZE = 500;
+
+  for (let offset = 0; offset < toSync.length; offset += BATCH_SIZE) {
+    const chunk = toSync.slice(offset, offset + BATCH_SIZE);
+    const refs = chunk.map((s) => col.doc(s.id));
+    const existing = await Promise.all(refs.map((r) => r.get()));
+    const batch = db.batch();
+    for (let i = 0; i < chunk.length; i++) {
+      try {
+        const { id, ...data } = chunk[i];
+        const ref = refs[i];
+        if (existing[i].exists) {
+          batch.update(ref, data);
+          updated++;
+        } else {
+          batch.set(ref, data);
+          created++;
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        errors.push(`Item "${chunk[i]?.title ?? "?"}": ${msg}`);
+      }
+    }
+    await batch.commit();
+  }
+
+  return { created, updated, errors };
+}
+
+/** Import scholarships from RSS/Atom feeds. All items go through quality pipeline. */
+export async function syncFromRssFeeds(
+  feedUrls: string[],
+  sourceLabel = "rss_feed"
+): Promise<{ created: number; updated: number; errors: string[] }> {
+  const { parseRssFeedsToItems } = await import("./rssFeedSync");
+  const items = await parseRssFeedsToItems(feedUrls, sourceLabel);
+  return writeExternalItemsToFirestore(items, sourceLabel);
+}
+
+/** Import scholarships from multiple URLs (JSON array or { items/data/scholarships/results } per URL). */
+export async function syncFromUrlList(
+  urls: string[],
+  sourceLabel = "import_url"
+): Promise<{ created: number; updated: number; errors: string[] }> {
+  const allItems: ExternalScholarshipItem[] = [];
+  const errors: string[] = [];
+
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
+    try {
+      const items = await fetchJsonArray(url);
+      for (let j = 0; j < items.length; j++) {
+        const item = items[j];
+        const prefix = `import_${i}_${j}_`;
+        const rawId = item.id ?? [item.title, item.name].find(Boolean) ?? "item";
+        const id = typeof rawId === "string" ? rawId : String(rawId);
+        allItems.push({ ...item, id: `${prefix}${slugify(String(id))}`.slice(0, 100) });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      errors.push(`URL ${url}: ${msg}`);
+    }
+  }
+
+  const result = await writeExternalItemsToFirestore(allItems, sourceLabel);
+  result.errors.push(...errors);
+  return result;
+}
+
+/** Import from NIH RePORTER API (research/fellowships). Enable with NIH_REPORTER_ENABLED. May 403 in some environments. */
+export async function syncFromNihReporter(): Promise<{ created: number; updated: number; errors: string[] }> {
+  const { fetchNihProjectsAsItems } = await import("./nihReporterApi");
+  const items = await fetchNihProjectsAsItems();
+  return writeExternalItemsToFirestore(items, "nih_reporter");
+}
 function parseGrantsGovDate(s: string | undefined): string {
   if (!s || typeof s !== "string") return "2026-12-31";
   const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -361,13 +483,25 @@ function skipGrantsGovByEligibility(details: {
   return false;
 }
 
-/** Sync federal grants from Grants.gov into Firestore. No API key required. */
-export async function syncFromGrantsGov(maxResults = 300): Promise<{
+/** Sync federal grants from Grants.gov into Firestore. No API key required.
+ * Fetches by keywords: education, scholarship, fellowship (merged by opportunity id). */
+export async function syncFromGrantsGov(maxResults = 500): Promise<{
   created: number;
   updated: number;
   errors: string[];
 }> {
-  const hits = await listEducationGrants(maxResults);
+  const [educationHits, scholarshipHits, fellowshipHits] = await Promise.all([
+    listEducationGrants(Math.floor(maxResults * 0.6)),
+    listGrantsByKeyword("scholarship", 200),
+    listGrantsByKeyword("fellowship", 200),
+  ]);
+  const seen = new Set<string>();
+  const hits: GrantsGovOppHit[] = [];
+  for (const h of [...educationHits, ...scholarshipHits, ...fellowshipHits]) {
+    if (seen.has(h.id)) continue;
+    seen.add(h.id);
+    hits.push(h);
+  }
   const db = getAdminFirestore();
   const col = db.collection("scholarships");
   let created = 0;

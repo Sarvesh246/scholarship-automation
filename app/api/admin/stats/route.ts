@@ -110,6 +110,8 @@ export async function GET(request: Request) {
       "SCHOLARSHIP_OWL_API_KEY",
       "SCHOLARSHIP_API_URL",
       "SCHOLARSHIP_API_KEY",
+      "SCHOLARSHIP_RSS_FEEDS",
+      "NIH_REPORTER_ENABLED",
     ].map((k) => ({ key: k, set: !!(process.env[k] ?? "").trim() }));
 
     return NextResponse.json({

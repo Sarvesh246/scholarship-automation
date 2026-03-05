@@ -80,6 +80,7 @@ function ToastCard({
   onDismiss: (id: number) => void;
 }) {
   const v = variantStyles[toast.variant ?? "default"];
+  const isClickable = !!(toast.onAction && toast.actionLabel);
   return (
     <div
       role="status"
@@ -87,8 +88,10 @@ function ToastCard({
       className={cn(
         "toast-card flex overflow-hidden rounded-2xl border transition-all duration-200",
         "border-[var(--toast-border)] bg-[var(--toast-bg)] shadow-[var(--toast-shadow)]",
+        isClickable && "cursor-pointer",
         "toast-enter"
       )}
+      onClick={isClickable ? (e) => { if (!(e.target as HTMLElement).closest("button[aria-label='Dismiss']")) toast.onAction?.(); } : undefined}
     >
       <div className={cn("w-1 shrink-0", v.accent)} aria-hidden />
       <div className="flex min-w-0 flex-1 items-start gap-3 px-4 py-3">
@@ -108,7 +111,7 @@ function ToastCard({
             <button
               type="button"
               className="mt-2 rounded-lg bg-[var(--surface-2)] px-2.5 py-1.5 text-xs font-medium text-[var(--text)] hover:bg-amber-500/15 hover:text-amber-400 transition-colors"
-              onClick={toast.onAction}
+              onClick={(e) => { e.stopPropagation(); toast.onAction?.(); }}
             >
               {toast.actionLabel}
             </button>
@@ -116,9 +119,9 @@ function ToastCard({
         </div>
         <button
           type="button"
-          onClick={() => onDismiss(toast.id)}
-          className="shrink-0 rounded-lg p-1.5 text-[var(--muted-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] transition-colors"
           aria-label="Dismiss"
+          onClick={(e) => { e.stopPropagation(); onDismiss(toast.id); }}
+          className="shrink-0 rounded-lg p-1.5 text-[var(--muted-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />

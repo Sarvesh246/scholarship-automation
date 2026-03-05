@@ -58,7 +58,7 @@ export default function DeadlinesPage() {
         if (cancelled) return;
         computeMatchesForUser(user.uid, profile, scholarships).then((results) => {
           if (!cancelled) setMatchResults(results.map((r) => ({ id: r.scholarshipId, matchScore: r.matchScore, eligibilityStatus: r.eligibilityStatus })));
-        });
+        }).catch(() => {});
       };
       if (typeof requestIdleCallback !== "undefined") {
         requestIdleCallback(runMatch, { timeout: 600 });

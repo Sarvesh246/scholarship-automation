@@ -29,8 +29,8 @@ function isJunkScholarship(s: Scholarship): boolean {
 
 function passesQualityGate(s: Scholarship): boolean {
   const status = s.verificationStatus;
-  if (status === "approved") return true;
-  if (status === "hidden" || status === "flagged" || status === "needs_review") return false;
+  if (status === "approved" || status === "needs_review") return true;
+  if (status === "hidden" || status === "flagged") return false;
   if (status === undefined && s.qualityScore === undefined) return true;
   const score = s.qualityScore ?? 0;
   return score >= MIN_SCORE_APPROVED;
@@ -43,7 +43,7 @@ function passesQualityGate(s: Scholarship): boolean {
  */
 export async function getScholarships(includeDrafts = false): Promise<Scholarship[]> {
   if (typeof window === "undefined") return [];
-  if (firstPageCache && !includeDrafts) return firstPageCache;
+  if (firstPageCache != null && firstPageCache.length > 0 && !includeDrafts) return firstPageCache;
   try {
     const items = await fetchScholarshipsFirstPage(100);
     const filtered = includeDrafts
@@ -53,7 +53,7 @@ export async function getScholarships(includeDrafts = false): Promise<Scholarshi
           if (!showInMainFeed(s)) return false;
           return passesQualityGate(s);
         });
-    if (!includeDrafts) firstPageCache = filtered;
+    if (!includeDrafts) firstPageCache = filtered.length > 0 ? filtered : null;
     return filtered;
   } catch {
     return [];

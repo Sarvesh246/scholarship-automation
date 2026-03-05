@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Space_Grotesk } from "next/font/google";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { ReactNode } from "react";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -11,15 +10,17 @@ import { ScrapeJobPoller } from "@/components/ScrapeJobPoller";
 const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-dm-sans",
-  display: "swap",
-  weight: ["400", "500", "600", "700"]
+  display: "optional",
+  weight: ["400", "500", "600", "700"],
+  preload: false,
 });
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   variable: "--font-space-grotesk",
-  display: "swap",
-  weight: ["400", "500", "600", "700"]
+  display: "optional",
+  weight: ["400", "500", "600", "700"],
+  preload: false,
 });
 
 export const viewport: Viewport = {
@@ -66,13 +67,12 @@ const themeScript = `
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" data-app-version="firestore-2025-03" className={`${dmSans.variable} ${spaceGrotesk.variable}`}>
-      <body suppressHydrationWarning>
+      <body suppressHydrationWarning className="font-sans">
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <ThemeInit />
         <ToastProvider>
           <ScrapeJobPoller />
           <FirebaseAnalyticsInit />
-          <SpeedInsights />
           {children}
         </ToastProvider>
       </body>

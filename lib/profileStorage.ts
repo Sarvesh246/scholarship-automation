@@ -15,23 +15,28 @@ export async function getProfile(): Promise<Profile> {
   try {
     const snap = await getDoc(doc(db, "users", uid));
     if (!snap.exists()) return defaultProfile;
-    const data = snap.data();
+    const data = snap.data() as Record<string, unknown>;
+    const loc = (data.location ?? {}) as Record<string, unknown>;
+    const locState = (loc?.state ?? loc?.state_code ?? loc?.stateCode) as string | undefined;
+    const location = (data.location && typeof data.location === "object")
+      ? { ...(data.location as Record<string, unknown>), state: (data.location as Record<string, unknown>).state ?? locState }
+      : locState ? { state: locState, country: loc?.country, city: loc?.city } : undefined;
     return {
-      academics: data.academics ?? defaultProfile.academics,
+      academics: (data.academics ?? defaultProfile.academics) as Profile["academics"],
       activities: Array.isArray(data.activities) ? data.activities : defaultProfile.activities,
       awards: Array.isArray(data.awards) ? data.awards : defaultProfile.awards,
-      demographics: data.demographics,
-      financial: data.financial ?? defaultProfile.financial,
+      demographics: data.demographics as Profile["demographics"],
+      financial: (data.financial ?? defaultProfile.financial) as Profile["financial"],
       onboardingComplete: data.onboardingComplete === true,
-      location: data.location,
-      educationLevel: data.educationLevel,
-      schoolName: data.schoolName,
-      intendedMajors: Array.isArray(data.intendedMajors) ? data.intendedMajors : undefined,
-      majorsFreeText: data.majorsFreeText,
-      timeBudgetPreference: data.timeBudgetPreference,
-      essayPreference: data.essayPreference,
-      needBasedInterest: data.needBasedInterest,
-      optionalEligibility: data.optionalEligibility,
+      location: location as Profile["location"],
+      educationLevel: (data.educationLevel ?? data.education_level) as Profile["educationLevel"],
+      schoolName: data.schoolName as string | undefined,
+      intendedMajors: Array.isArray(data.intendedMajors) ? data.intendedMajors : (Array.isArray(data.intended_majors) ? data.intended_majors : undefined),
+      majorsFreeText: (data.majorsFreeText ?? data.majors_free_text) as string | undefined,
+      timeBudgetPreference: (data.timeBudgetPreference ?? data.time_budget_preference) as Profile["timeBudgetPreference"],
+      essayPreference: data.essayPreference as boolean | undefined,
+      needBasedInterest: data.needBasedInterest as boolean | undefined,
+      optionalEligibility: data.optionalEligibility as Profile["optionalEligibility"],
     };
   } catch {
     return defaultProfile;

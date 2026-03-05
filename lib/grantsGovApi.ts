@@ -136,7 +136,30 @@ export async function listEducationGrants(maxResults = 500): Promise<GrantsGovOp
     all.push(...resp.data.oppHits);
     if (resp.data.oppHits.length < rows) break;
     startRecordNum += rows;
-    if (all.length >= resp.data.hitCount) break;
+    if (all.length >= (resp.data.hitCount ?? 0)) break;
+  }
+
+  return all.slice(0, maxResults);
+}
+
+/** Fetch posted opportunities by keyword (e.g. "scholarship", "fellowship"). */
+export async function listGrantsByKeyword(keyword: string, maxResults = 200): Promise<GrantsGovOppHit[]> {
+  const all: GrantsGovOppHit[] = [];
+  const rows = 100;
+  let startRecordNum = 0;
+
+  while (all.length < maxResults) {
+    const resp = await searchGrants({
+      keyword,
+      rows,
+      startRecordNum,
+      oppStatuses: "posted",
+    });
+    if (resp.errorcode !== 0 || !resp.data?.oppHits?.length) break;
+    all.push(...resp.data.oppHits);
+    if (resp.data.oppHits.length < rows) break;
+    startRecordNum += rows;
+    if (all.length >= (resp.data.hitCount ?? 0)) break;
   }
 
   return all.slice(0, maxResults);

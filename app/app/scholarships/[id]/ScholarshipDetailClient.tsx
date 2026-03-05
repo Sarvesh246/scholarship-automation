@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/Badge";
 import { Tag } from "@/components/ui/Tag";
@@ -48,7 +48,9 @@ export default function ScholarshipDetailClient() {
   const [suggestedEssays, setSuggestedEssays] = useState<{ id: string; title: string; wordCount: number }[]>([]);
   const { showToast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useUser();
+  const isDebug = searchParams.get("debug") === "1";
 
   const loadScholarship = useCallback(async () => {
     const s = await getScholarship(id);
@@ -168,8 +170,17 @@ export default function ScholarshipDetailClient() {
   const canApplyOwl = isOwl && !isExpired && (eligibility?.eligible ?? true);
 
   const matchResult: ScholarshipMatchResult | null = scholarship && profile
-    ? computeMatch(scholarship, buildUserSignals(profile))
+    ? computeMatch(scholarship, buildUserSignals(profile), { includeBreakdown: isDebug })
     : null;
+  const displayMatchPct =
+    matchResult != null
+      ? (() => {
+          const raw = matchResult.matchPercent ?? matchResult.matchScore;
+          const n = Number(raw);
+          const pct = Number.isFinite(n) ? Math.round(n) : 0;
+          return matchResult.reasons?.length > 0 && pct === 0 ? 50 : pct;
+        })()
+      : 0;
   const hasEligibilityTags = (scholarship?.eligibilityTags ?? []).length > 0;
 
   if (loading) {
@@ -238,6 +249,56 @@ export default function ScholarshipDetailClient() {
       )}
       {eligibility?.eligible && eligibility.message && (
         <p className="text-xs text-[var(--muted)]">{eligibility.message}</p>
+      )}
+
+      {matchResult != null && (() => {
+        const rawPct = matchResult.matchPercent ?? matchResult.matchScore;
+        const pct = Number(rawPct);
+        const numPct = Number.isFinite(pct) ? Math.round(pct) : 0;
+        const displayPct = (matchResult.reasons?.length > 0 && numPct === 0) ? 50 : numPct;
+        return (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+          <span className="text-xs font-medium text-[var(--muted)]">Your match</span>
+          <span
+            className={`rounded-full text-sm font-semibold px-3 py-1 ${
+              displayPct >= 50
+                ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                : displayPct >= 25
+                  ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                  : "bg-[var(--muted)]/20 text-[var(--muted-2)]"
+            }`}
+          >
+            {displayPct}%
+          </span>
+          <span className="text-[10px] text-[var(--muted-2)] uppercase">Eligibility: {matchResult.eligibilityStatus}</span>
+          {matchResult.reasons.length > 0 && (
+            <span className="text-xs text-[var(--muted-2)]">
+              Based on: {matchResult.reasons.slice(0, 3).join(", ")}
+            </span>
+          )}
+          {matchResult.missingProfileFields?.length > 0 && (
+            <span className="text-[10px] text-amber-600 dark:text-amber-400">
+              Add {matchResult.missingProfileFields.join(", ")} for more matches
+            </span>
+          )}
+          {matchResult.eligibilityStatus === "ineligible" && (matchResult.failedCriteria?.length ?? 0) > 0 && (
+            <span className="text-xs text-amber-600 dark:text-amber-400">
+              {matchResult.failedCriteria?.slice(0, 2).join(" · ")}
+            </span>
+          )}
+        </div>
+        );
+      })()}
+
+      {matchResult?.matchBreakdown && (
+        <details className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs">
+          <summary className="cursor-pointer font-medium text-[var(--muted)]">Match breakdown (debug)</summary>
+          <div className="mt-3 space-y-2 font-mono text-[10px]">
+            <p><strong>Gates:</strong> deadline {matchResult.matchBreakdown.gates.deadline}, location {matchResult.matchBreakdown.gates.location}, education {matchResult.matchBreakdown.gates.educationLevel}, gpa {matchResult.matchBreakdown.gates.gpa}, major {matchResult.matchBreakdown.gates.major}</p>
+            <p><strong>Score:</strong> location {matchResult.matchBreakdown.scoreBreakdown.location}/15, education {matchResult.matchBreakdown.scoreBreakdown.educationLevel}/20, gpa {matchResult.matchBreakdown.scoreBreakdown.gpa}/15, major {matchResult.matchBreakdown.scoreBreakdown.major}/15, need {matchResult.matchBreakdown.scoreBreakdown.needBased}/10, essay {matchResult.matchBreakdown.scoreBreakdown.essay}/10, effort {matchResult.matchBreakdown.scoreBreakdown.effort}/10, activities {matchResult.matchBreakdown.scoreBreakdown.activities}/5 → total {matchResult.matchBreakdown.scoreBreakdown.total}</p>
+            <p><strong>Readiness penalty:</strong> {matchResult.matchBreakdown.readinessPenalty} · <strong>Eligibility multiplier:</strong> {matchResult.matchBreakdown.eligibilityMultiplier}</p>
+          </div>
+        </details>
       )}
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
@@ -337,10 +398,10 @@ export default function ScholarshipDetailClient() {
                       <li key={tag}>{decodeHtmlEntities(tag)}</li>
                     ))}
                   </ul>
-                  {matchResult != null && matchResult.matchScore > 0 && (
+                  {matchResult != null && (
                     <div className="mt-4 pt-4 border-t border-[var(--border)]">
                       <p className="text-xs font-medium text-[var(--muted)] mb-1">
-                        Your fit: {matchResult.matchScore}%
+                        Your fit: {displayMatchPct}%
                       </p>
                       {matchResult.reasons.length > 0 && (
                         <p className="text-xs text-emerald-400/90">
@@ -350,12 +411,20 @@ export default function ScholarshipDetailClient() {
                     </div>
                   )}
                 </>
-              ) : matchResult != null && matchResult.matchScore > 0 ? (
+              ) : matchResult != null ? (
                 <>
                   <p className="text-xs text-[var(--muted-2)]">No specific eligibility criteria listed. Based on your profile, here’s why you’re a good fit:</p>
                   <div className="mt-2 flex items-center gap-2">
-                    <span className="rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold px-2.5 py-1">
-                      {matchResult.matchScore}% match
+                    <span
+                      className={`rounded-full text-sm font-semibold px-2.5 py-1 ${
+                        displayMatchPct >= 50
+                          ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                          : displayMatchPct >= 25
+                            ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                            : "bg-[var(--muted)]/20 text-[var(--muted-2)]"
+                      }`}
+                    >
+                      {displayMatchPct}% match
                     </span>
                   </div>
                   {matchResult.reasons.length > 0 && (
@@ -370,6 +439,9 @@ export default function ScholarshipDetailClient() {
                   )}
                   {matchResult.almostEligibleReason && (
                     <p className="mt-2 text-xs text-amber-500/90">{matchResult.almostEligibleReason}</p>
+                  )}
+                  {matchResult.eligibilityStatus === "ineligible" && (matchResult.failedCriteria?.length ?? 0) > 0 && (
+                    <p className="mt-2 text-xs text-amber-500/90">{matchResult.failedCriteria?.join(" · ")}</p>
                   )}
                 </>
               ) : (

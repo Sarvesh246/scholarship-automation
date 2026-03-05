@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/requireAdminAuth";
-import { syncFromScholarshipOwl, syncScholarshipsFromUrl, syncFromGrantsGov } from "@/lib/syncScholarships";
+import { syncFromScholarshipOwl, syncScholarshipsFromUrl, syncFromGrantsGov, syncFromRssFeeds, syncFromNihReporter } from "@/lib/syncScholarships";
 import { deleteExpiredScholarships, deleteJunkScholarships } from "@/lib/scholarshipDeadline";
 import { logSync, logError } from "@/lib/adminLog";
 import { invalidateListCache } from "@/lib/scholarshipCache";
@@ -10,6 +10,9 @@ export const dynamic = "force-dynamic";
 const SCHOLARSHIP_OWL_API_KEY = process.env.SCHOLARSHIP_OWL_API_KEY;
 const SCHOLARSHIP_API_URL = process.env.SCHOLARSHIP_API_URL;
 const SCHOLARSHIP_API_KEY = process.env.SCHOLARSHIP_API_KEY;
+/** Comma-separated RSS/Atom feed URLs for scholarship listings. */
+const SCHOLARSHIP_RSS_FEEDS = process.env.SCHOLARSHIP_RSS_FEEDS;
+const NIH_REPORTER_ENABLED = process.env.NIH_REPORTER_ENABLED === "true" || process.env.NIH_REPORTER_ENABLED === "1";
 
 /**
  * POST /api/admin/sync
@@ -27,9 +30,20 @@ export async function POST(request: Request) {
   const urlPromise = SCHOLARSHIP_API_URL
     ? syncScholarshipsFromUrl(SCHOLARSHIP_API_URL, SCHOLARSHIP_API_KEY).then((r) => ({ ok: true, ...r })).catch((err: unknown) => ({ ok: false, err }))
     : Promise.resolve({ ok: "skipped" as const, skipped: "SCHOLARSHIP_API_URL not set" });
-  const grantsPromise = syncFromGrantsGov(300).then((r) => ({ ok: true, ...r })).catch((err: unknown) => ({ ok: false, err }));
+  const grantsPromise = syncFromGrantsGov(500).then((r) => ({ ok: true, ...r })).catch((err: unknown) => ({ ok: false, err }));
 
-  const [owlRes, urlRes, grantsRes] = await Promise.all([owlPromise, urlPromise, grantsPromise]);
+  const rssFeedUrls = SCHOLARSHIP_RSS_FEEDS
+    ? SCHOLARSHIP_RSS_FEEDS.split(",").map((u) => u.trim()).filter(Boolean)
+    : [];
+  const rssPromise = rssFeedUrls.length > 0
+    ? syncFromRssFeeds(rssFeedUrls, "rss").then((r) => ({ ok: true as const, ...r })).catch((err: unknown) => ({ ok: false as const, err }))
+    : Promise.resolve({ ok: "skipped" as const, skipped: "SCHOLARSHIP_RSS_FEEDS not set" });
+
+  const nihPromise = NIH_REPORTER_ENABLED
+    ? syncFromNihReporter().then((r) => ({ ok: true as const, ...r })).catch((err: unknown) => ({ ok: false as const, err }))
+    : Promise.resolve({ ok: "skipped" as const, skipped: "NIH_REPORTER_ENABLED not set" });
+
+  const [owlRes, urlRes, grantsRes, rssRes, nihRes] = await Promise.all([owlPromise, urlPromise, grantsPromise, rssPromise, nihPromise]);
 
   if (owlRes.ok === true && "created" in owlRes) {
     results.owl = { created: owlRes.created, updated: owlRes.updated, errors: owlRes.errors?.length ? owlRes.errors : undefined };
@@ -48,6 +62,24 @@ export async function POST(request: Request) {
     logError("url", urlRes.err instanceof Error ? urlRes.err.message : "URL sync failed").catch(() => {});
     results.urlError = urlRes.err instanceof Error ? urlRes.err.message : "URL sync failed";
   } else results.url = urlRes;
+
+  if (rssRes.ok === true && "created" in rssRes) {
+    results.rss = { created: rssRes.created, updated: rssRes.updated, errors: rssRes.errors?.length ? rssRes.errors : undefined };
+    logSync("rss", rssRes.created, rssRes.updated, rssRes.errors).catch(() => {});
+  } else if (rssRes.ok === false && "err" in rssRes) {
+    console.error("[admin/sync] RSS", rssRes.err);
+    logError("rss", rssRes.err instanceof Error ? rssRes.err.message : "RSS sync failed").catch(() => {});
+    results.rssError = rssRes.err instanceof Error ? rssRes.err.message : "RSS sync failed";
+  } else results.rss = rssRes;
+
+  if (nihRes.ok === true && "created" in nihRes) {
+    results.nihReporter = { created: nihRes.created, updated: nihRes.updated, errors: nihRes.errors?.length ? nihRes.errors : undefined };
+    logSync("nihReporter", nihRes.created, nihRes.updated, nihRes.errors).catch(() => {});
+  } else if (nihRes.ok === false && "err" in nihRes) {
+    console.error("[admin/sync] NIH RePORTER", nihRes.err);
+    logError("nihReporter", nihRes.err instanceof Error ? nihRes.err.message : "NIH RePORTER sync failed").catch(() => {});
+    results.nihReporterError = nihRes.err instanceof Error ? nihRes.err.message : "NIH RePORTER sync failed";
+  } else results.nihReporter = nihRes;
 
   if (grantsRes.ok === true && "created" in grantsRes) {
     results.grantsGov = { created: grantsRes.created, updated: grantsRes.updated, errors: grantsRes.errors?.length ? grantsRes.errors : undefined };
