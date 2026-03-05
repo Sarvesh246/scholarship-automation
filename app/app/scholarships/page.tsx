@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -15,18 +15,20 @@ import { fetchScholarshipsPage } from "@/lib/scholarshipApi";
 import { getScholarships, invalidateScholarshipCache } from "@/lib/scholarshipStorage";
 import { getApplications, ensureApplication } from "@/lib/applicationStorage";
 import { getProfile } from "@/lib/profileStorage";
+import { auth } from "@/lib/firebase";
 import { classifyScholarship } from "@/lib/classifyScholarship";
 import { isSweepstakes, MIN_SCORE_HIGH_QUALITY_ONLY } from "@/lib/scholarshipQuality";
 import {
   computeMatchesForUser,
   getCachedMatches,
   invalidateMatchCache,
+  profileHasAnyMatchData,
   GREENLIGHT_MIN_SCORE,
   NEAR_MATCH_MIN_SCORE,
 } from "@/lib/matchEngine";
 import { getROIScore, getOpportunityScore, isHighROI, percentile80, getFreshnessTimestamp } from "@/lib/opportunityScore";
 import { useUser } from "@/hooks/useUser";
-import type { Scholarship, ScholarshipCategory, ScholarshipMatchResult } from "@/types";
+import type { Scholarship, ScholarshipCategory, ScholarshipMatchResult, Profile } from "@/types";
 
 type SortOption = "opportunity" | "soonest" | "best_match" | "amount";
 type TypeFilter = "all" | "non_citizen" | "private" | "government";
@@ -70,6 +72,7 @@ export default function ScholarshipsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const qFromUrl = searchParams.get("q") ?? "";
+  const matchDebug = searchParams.get("debug") === "1";
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("best_match");
   const [deadlineDays, setDeadlineDays] = useState<DeadlineFilter>("any");
@@ -81,6 +84,7 @@ export default function ScholarshipsPage() {
   const [displayCategoryFilter, setDisplayCategoryFilter] = useState<DisplayCategoryFilter>("scholarships_only");
   const [greenlightOn, setGreenlightOn] = useState(false);
   const [showNearMatches, setShowNearMatches] = useState(false);
+  const [hideUnknownEligibility, setHideUnknownEligibility] = useState(false);
   const [highQualityOnly, setHighQualityOnly] = useState(false);
   const [matchResults, setMatchResults] = useState<ScholarshipMatchResult[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -95,7 +99,10 @@ export default function ScholarshipsPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [profileSummary, setProfileSummary] = useState<{ hasState: boolean; hasMajor: boolean } | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [profileError, setProfileError] = useState<Error | null>(null);
   const [, setTimeAgoTick] = useState(0);
+  const itemsLengthRef = useRef(0);
 
   const { user } = useUser();
 
@@ -109,7 +116,8 @@ export default function ScholarshipsPage() {
   const loadScholarships = useCallback(async (invalidate = false) => {
     if (invalidate) {
       invalidateScholarshipCache();
-      if (user?.uid) invalidateMatchCache(user.uid);
+      const uid = user?.uid ?? "anonymous";
+      invalidateMatchCache(uid);
     }
     setLoading(true);
     try {
@@ -151,10 +159,30 @@ export default function ScholarshipsPage() {
   }, [loading, loadingMore, nextCursor, loadMore]);
 
   useEffect(() => {
-    if (!user?.uid || items.length === 0) return;
+    if (items.length === 0) return;
+    itemsLengthRef.current = items.length;
+    const userId = user?.uid ?? "anonymous";
     let cancelled = false;
     const run = async () => {
-      const profile = await getProfile();
+      setProfileLoaded(false);
+      setProfileError(null);
+      let profile: Profile;
+      try {
+        profile = await getProfile();
+        setProfileLoaded(true);
+        console.log("uid:", auth?.currentUser?.uid);
+        console.log("profile:", profile);
+        console.log("profileLoaded:", true);
+        console.log("profileError:", null);
+      } catch (e) {
+        setProfileError(e instanceof Error ? e : new Error(String(e)));
+        setProfileLoaded(true);
+        console.log("uid:", auth?.currentUser?.uid);
+        console.log("profile:", undefined);
+        console.log("profileLoaded:", true);
+        console.log("profileError:", e);
+        return;
+      }
       if (cancelled) return;
       setProfileSummary({
         hasState: !!(profile.location?.state?.trim() ?? profile.demographics?.state?.trim()),
@@ -164,26 +192,30 @@ export default function ScholarshipsPage() {
           (profile.majorsFreeText ?? "").trim() !== ""
         ),
       });
-      const cached = getCachedMatches(user.uid);
-      if (cached && cached.length === items.length) {
+      const cached = getCachedMatches(userId);
+      if (cached && cached.length === items.length && !matchDebug && profileHasAnyMatchData(profile)) {
         setMatchResults(cached);
         return;
       }
-      const runMatch = () => {
-        if (cancelled) return;
-        computeMatchesForUser(user.uid, profile, items).then((results) => {
-          if (!cancelled) setMatchResults(results);
-        });
-      };
-      if (typeof requestIdleCallback !== "undefined") {
-        requestIdleCallback(runMatch, { timeout: 600 });
-      } else {
-        setTimeout(runMatch, 0);
-      }
+      computeMatchesForUser(userId, profile, items, { includeBreakdown: matchDebug })
+        .then((results) => {
+          if (cancelled) return;
+          if (results.length !== itemsLengthRef.current) return;
+          setMatchResults(results);
+          if (typeof window !== "undefined" && (matchDebug || process.env.NODE_ENV === "development") && results.length > 0) {
+            const first = results[0];
+            console.log("[Scholarships] Match debug:", {
+              userId,
+              profileSnapshot: { educationLevel: profile.educationLevel, state: profile.location?.state ?? profile.demographics?.state, majors: profile.intendedMajors ?? profile.academics?.major },
+              firstResult: { scholarshipId: first.scholarshipId, matchPercent: first.matchPercent, matchScore: first.matchScore, reasonsCount: first.reasons?.length },
+            });
+          }
+        })
+        .catch(() => {});
     };
     run();
     return () => { cancelled = true; };
-  }, [user?.uid, items]);
+  }, [user?.uid, items, matchDebug]);
 
   useEffect(() => {
     if (qFromUrl !== "" && qFromUrl !== query) setQuery(qFromUrl);
@@ -252,12 +284,16 @@ export default function ScholarshipsPage() {
       if (s.displayCategory === "sweepstakes") return false;
       const match = matchResultsMap.get(s.id);
       if (!match) return false;
-      const strongEligible = (match.eligibilityStatus === "eligible" || match.eligibilityStatus === "almost_eligible") && match.matchScore >= GREENLIGHT_MIN_SCORE;
-      const nearEligible = (match.eligibilityStatus === "may_not_be_eligible" || match.eligibilityStatus === "almost_eligible") && match.matchScore >= NEAR_MATCH_MIN_SCORE && match.matchScore < GREENLIGHT_MIN_SCORE;
-      if (showNearMatches) return strongEligible || nearEligible;
-      return strongEligible;
+      if (match.eligibilityStatus === "ineligible") return false;
+      if (hideUnknownEligibility && match.eligibilityStatus === "unknown") return false;
+      const pct = match.matchPercent ?? match.matchScore;
+      const strongEligible = (match.eligibilityStatus === "eligible" || match.eligibilityStatus === "almost_eligible") && pct >= GREENLIGHT_MIN_SCORE;
+      const nearEligible = (match.eligibilityStatus === "may_not_be_eligible" || match.eligibilityStatus === "almost_eligible") && pct >= NEAR_MATCH_MIN_SCORE && pct < GREENLIGHT_MIN_SCORE;
+      const unknownOk = match.eligibilityStatus === "unknown" && pct >= minScore;
+      if (showNearMatches) return strongEligible || nearEligible || unknownOk;
+      return strongEligible || unknownOk;
     });
-  }, [filtered, greenlightOn, showNearMatches, matchResultsMap]);
+  }, [filtered, greenlightOn, showNearMatches, hideUnknownEligibility, matchResultsMap]);
 
   const greenlightTotalAmount = useMemo(() => {
     if (!greenlightOn || greenlightFiltered.length === 0) return 0;
@@ -276,7 +312,7 @@ export default function ScholarshipsPage() {
     const list = greenlightOn ? [...greenlightFiltered] : [...filtered];
     const getDeadline = (s: Scholarship) => (s.deadline ? new Date(s.deadline).getTime() : 0);
     const getAmount = (s: Scholarship) => s.amount ?? 0;
-    const getMatchScore = (s: Scholarship) => matchResultsMap.get(s.id)?.matchScore ?? 0;
+    const getMatchScore = (s: Scholarship) => matchResultsMap.get(s.id)?.matchPercent ?? matchResultsMap.get(s.id)?.matchScore ?? 0;
     const getROI = (s: Scholarship) => getROIScore(s, matchResultsMap.get(s.id)?.matchScore);
     const getOpportunity = (s: Scholarship) => getOpportunityScore(s);
     const getFreshness = (s: Scholarship) => getFreshnessTimestamp(s);
@@ -314,7 +350,7 @@ export default function ScholarshipsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [query, sortBy, deadlineDays, minAmount, category, effort, hideExpired, typeFilter, displayCategoryFilter, greenlightOn, showNearMatches]);
+  }, [query, sortBy, deadlineDays, minAmount, category, effort, hideExpired, typeFilter, displayCategoryFilter, greenlightOn, showNearMatches, hideUnknownEligibility]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -419,6 +455,9 @@ export default function ScholarshipsPage() {
           </p>
           <p className="text-sm text-[var(--muted)]">
             Your profile (state, major, education level, and more) drives the curation. We exclude low-quality or risky listings and factor in award amount and effort. The result is a focused list built for you, updated as you update your profile.
+          </p>
+          <p className="text-xs text-[var(--muted-2)]">
+            Scholarships we can’t fully verify (missing data) are included by default. Use “Hide scholarships with unknown eligibility” if you want only confirmed-eligible items.
           </p>
         </div>
       </Modal>
@@ -552,6 +591,7 @@ export default function ScholarshipsPage() {
             setDisplayCategoryFilter("scholarships_only");
             setGreenlightOn(false);
             setShowNearMatches(false);
+            setHideUnknownEligibility(false);
             setHideExpired(true);
             setHighQualityOnly(false);
             setPage(1);
@@ -581,7 +621,7 @@ export default function ScholarshipsPage() {
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Add profile details so we can personalize your experience, or browse the full catalog.
               </p>
-              <p className="mt-1 text-xs text-[var(--muted-2)]">We didn&apos;t find 70%+ fits yet. Add your state, education level, or major to grow your list.</p>
+              <p className="mt-1 text-xs text-[var(--muted-2)]">We didn&apos;t find strong fits yet. Add your state, education level, or major to grow your list.</p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                 {!showNearMatches ? (
                   <Button
@@ -590,7 +630,7 @@ export default function ScholarshipsPage() {
                     size="sm"
                     onClick={() => setShowNearMatches(true)}
                   >
-                    Show Near Matches (50–69%)
+                    Show Near Matches (40–49%)
                   </Button>
                 ) : (
                   <Button
@@ -602,6 +642,15 @@ export default function ScholarshipsPage() {
                     Hide Near Matches
                   </Button>
                 )}
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-[var(--muted)]">
+                  <input
+                    type="checkbox"
+                    checked={hideUnknownEligibility}
+                    onChange={(e) => setHideUnknownEligibility(e.target.checked)}
+                    className="rounded border-[var(--border)] text-amber-500 focus:ring-amber-500/20"
+                  />
+                  Hide scholarships with unknown eligibility
+                </label>
                 <Link href="/app/profile">
                   <Button type="button" variant="primary" size="sm">
                     Add profile details
@@ -633,9 +682,10 @@ export default function ScholarshipsPage() {
               scholarship={scholarship}
               hasApplication={false}
               onStartApplication={handleStartApplication}
-              matchResult={greenlightOn ? matchResultsMap.get(scholarship.id) : undefined}
+              matchResult={matchResultsMap.get(scholarship.id)}
               greenlightHighlight={greenlightOn}
               showHighROI={isHighROI(getROIScore(scholarship, matchResultsMap.get(scholarship.id)?.matchScore), { percentile80: roi80 })}
+              showMatchBreakdown={matchDebug}
             />
           ))
         )}
