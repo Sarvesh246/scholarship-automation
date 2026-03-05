@@ -5,11 +5,13 @@ interface CardProps {
   children: ReactNode;
   className?: string;
   clickable?: boolean;
+  id?: string;
 }
 
-export function Card({ children, className, clickable }: CardProps) {
+export function Card({ children, className, clickable, id }: CardProps) {
   return (
     <div
+      id={id}
       className={cn(
         "rounded-2xl border bg-[var(--surface)] transition-all",
         "border-[var(--card-border)] shadow-[var(--card-shadow)] p-[var(--card-padding)]",
