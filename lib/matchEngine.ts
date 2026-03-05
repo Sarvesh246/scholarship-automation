@@ -381,7 +381,7 @@ function getMissingProfileFields(norm: NormalizedScholarship, signals: UserSigna
 
 /** Read array from scholarship; supports camelCase or snake_case (sync/import may use either). */
 function getScholarshipArray(s: Scholarship, key: string, altKey?: string): string[] {
-  const rec = s as Record<string, unknown>;
+  const rec = s as unknown as Record<string, unknown>;
   const raw = rec[key];
   if (Array.isArray(raw)) return raw.map((x) => String(x));
   if (altKey) {
